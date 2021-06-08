@@ -17,6 +17,8 @@ float orbit_radius=200;
 float ind_dist=30;
 const float pi=3.14159;
 
+sf::Vector2f operator*(float,sf::Vector2f);
+
 
 
 //float distance(const sf::Vector2f& a,const sf::Vector2f& b){
@@ -57,6 +59,7 @@ void updateCollisions(BulletList* bullets, ObstacleList* obstacles){
             collision=checkForCollision(b,o);
             if (collision){
                 o->terminate();
+                break;
             }
         }
         if(collision){b->terminate();}
@@ -75,14 +78,18 @@ int main() {
     window.setFramerateLimit(100);
 
     sf::FloatRect window_rect({0,0},{window_width,window_height});
+    sf::FloatRect r1({0,0},{window_width/2,window_height}),r2({window_width/2,0},{window_width/2,window_height});
 
     std::vector<BulletList*> BulletListIndex(0);
-    BulletList pociski(window_rect);
-    BulletListIndex.emplace_back(&pociski);
-
     std::vector<ObstacleList*> ObstacleListIndex(0);
-    ObstacleList przeszkody1(window_rect);
+
+    BulletList left_area(r1), right_area(r2);
+    BulletListIndex.emplace_back(&left_area);
+    BulletListIndex.emplace_back(&right_area);
+
+    ObstacleList przeszkody1(r1),prz2(r2);
     ObstacleListIndex.emplace_back(&przeszkody1);
+    ObstacleListIndex.emplace_back(&prz2);
 
 
 //    tworzymy obiekty jakies
@@ -103,7 +110,6 @@ int main() {
 //    main loop
     while (window.isOpen()) {
     //    startowe rzeczy
-            //resetting edge flags
         sf::Time elapsed=timer.restart();
 
 
@@ -113,9 +119,9 @@ int main() {
             if (event.type == sf::Event::Closed||(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::Escape))
                 window.close();
             if(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::J){
-                std::cout<<"niice  ";
-                ObstacleListIndex[0]->randomObstacles(window_rect);
-                std::cout<<ObstacleListIndex[0]->obstacleCount()<<std::endl;
+                int i= rand()%2;
+                ObstacleListIndex[i]->randomObstacles(1,10,0,0,1,window_center,0,3);
+//                std::cout<<i<<"  "<<ObstacleListIndex[0]->obstacleCount()<<std::endl;
             }
         }
     //    obslugujemy eventy
@@ -126,8 +132,11 @@ int main() {
 
 
         updateCollisions(BulletListIndex[0],ObstacleListIndex[0]);
+        updateCollisions(BulletListIndex[1],ObstacleListIndex[1]);
         BulletListIndex[0]->update(elapsed);
+        BulletListIndex[1]->update(elapsed);
         ObstacleListIndex[0]->update(elapsed);
+        ObstacleListIndex[1]->update(elapsed);
 
     //    czyscimy i rysujemy obiekty
         window.clear(sf::Color::Black);

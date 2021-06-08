@@ -10,6 +10,9 @@
 //float distance(float,float,float,float);
 float toRad(float);
 float toDeg(float);
+sf::Vector2f operator* (float a, sf::Vector2f b){
+    return sf::Vector2f{b.x*a,b.y*a};
+}
 
 enum class GameSettings{
     Rows,Orbit,Free/*,Easy,Medium,Hard,Fast,Slow*/
@@ -85,30 +88,6 @@ public:
     }
 };
 
-/*class ObstacleList{
-    static std::vector<Obstacle*> obstacles;
-    void addObstacle(Obstacle* new_obstacle){     //ok
-        bullets.emplace_back(new_obstacle);
-    }
-    void removeObstacle(Obstacle* obstacle){      //ok
-        for (auto it=obstacles.begin();it!=obstacles.end();it++){
-            if (*it==obstacle){
-                delete obstacle;
-                obstacles.erase(it);
-                break;
-            }
-        }
-
-    }
-    int ObstacleCount(){return obstacles.size();}   //ez
-    void update(sf::Time& time){            //ok
-        for (auto& x:obstacles){
-            x->update(time);
-            if(x->overdue) {removeBullet(x);}
-        }
-    }
-};*/
-
 class Ship: public sf::CircleShape{
     float speed_main_;
     float speed_aux_;
@@ -124,7 +103,7 @@ class Ship: public sf::CircleShape{
     Dot center_;
     GameSettings mode_=GameSettings::Free;
 
-    void move(sf::Time& deltaT){
+    void move(sf::Time& deltaT, bool shootsOutsideOrbit=false){
         if(mode_==GameSettings::Free){
             float horizontal=0,vertical=0;
             float shift_mod=1+0.5*sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift);
@@ -139,12 +118,11 @@ class Ship: public sf::CircleShape{
             float angle=0;
             float shift_mod=1+0.5*sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift);
             angle=getRotation()+shift_mod*(sf::Keyboard::isKeyPressed(sf::Keyboard::D)-sf::Keyboard::isKeyPressed(sf::Keyboard::A))*deltaT.asSeconds()*speed_angular_*0.5;
-            std::cout<<angle<<"   "<<getRotation()<<std::endl;
 
             sf::CircleShape::setRotation(angle);
             setPosition(orbiting_point_+sf::Vector2f{orbiting_radius_*cosf(toRad(angle)),orbiting_radius_*sinf(toRad(angle))});
             center_.setPosition(sf::CircleShape::getPosition());
-            indicator_.setPosition(sf::CircleShape::getPosition()+sf::Vector2f{indicator_distance_*cosf(toRad(angle)),indicator_distance_*sinf(toRad(angle))});
+            indicator_.setPosition(sf::CircleShape::getPosition()+(1-2*!shootsOutsideOrbit)*sf::Vector2f{indicator_distance_*cosf(toRad(angle)),indicator_distance_*sinf(toRad(angle))});
         }
     }
     void rotate(sf::Time& deltaT){
@@ -156,11 +134,6 @@ class Ship: public sf::CircleShape{
         for(auto it=index->begin();it!=index->end();it++){
             if((*it)->region.contains(this->getPosition())){return *it;}          //nie wiem czy lepiej niż poniżej
         }
-//        for (BulletList* &x:*index){
-//            if(x->region.contains(this->getPosition())){
-//                return x;
-//            }
-//        }
         return nullptr;
     }
 public:
@@ -189,22 +162,22 @@ public:
         setRotation(0);
         cooldown_=0;
     }
-    void shoot(float speed){                            //ez
+    void shoot(float speed, bool shootsOutsideOrbit=false){                            //ez
         if(cooldown_>min_cooldown_){
             auto dest=bulletlistChoose(bullet_storage_);
             if(dest!=nullptr){
                 cooldown_=0;
-                Bullet* temp=new Bullet(getRotation()*(1-2*(mode_==GameSettings::Orbit)),indicator_.getPosition(),speed,power_);
+                Bullet* temp=new Bullet(getRotation()*(1-2*(mode_==GameSettings::Orbit))+180*(!shootsOutsideOrbit)*(mode_==GameSettings::Orbit),indicator_.getPosition(),speed,power_);
                 dest->bullets.emplace_back(temp);
             }
         }
     }
-    void update(sf::Time& deltaT){                                      //ez
+    void update(sf::Time& deltaT, bool shootsOutsideOrbit=false){                                      //ez
         if (cooldown_<min_cooldown_) cooldown_+=deltaT.asSeconds();
-        move(deltaT);
+        move(deltaT,shootsOutsideOrbit);
         if (mode_==GameSettings::Free)rotate(deltaT);
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)){
-            shoot(200);
+            shoot(200,shootsOutsideOrbit);
         }
 
     }
@@ -245,7 +218,7 @@ public:
         max_distance_=max_distance;
         direction_=direction;
         health_=health;
-        setOrigin(radius/2,radius/2);
+        setOrigin(radius,radius);
         setFillColor(sf::Color::Cyan);
     };
     void hit(float strength){
@@ -263,6 +236,7 @@ public:
     }
     bool overdue_=false;
     void terminate(){overdue_=true;}
+    void setSpeed(float speed){speed_=speed;}
 };
 
 class ObstacleList{
@@ -278,13 +252,16 @@ public:
     void addObstacle(Obstacle* new_obstacle){
         if(obstacleCount()<max_size)obstacles.emplace_back(new_obstacle);
     }
-    void randomObstacles(sf::FloatRect& range, int n=1, float radius=25, int health=1, bool isSpeedRandom=0){
+    void randomObstacles(int n=1, float speed=0, bool isSpeedRandom=0, float angle=0, bool isAngleRandom=0, sf::Vector2f pos={0,0}, bool isPositionRandom=1,  int health=1, float radius=25){
         for(int i=0;i<n;i++){
-            Obstacle* temp = new Obstacle(rand()%360,radius,health,isSpeedRandom*(rand()%100));
-            float x=fmodf(rand(),range.width-radius*2)+range.left+radius;
-            float y=fmodf(rand(),range.height-radius*2)+range.top+radius;
-            temp->setPosition(x,y);
+            Obstacle* temp = new Obstacle(isAngleRandom*rand()%360+angle*!isAngleRandom,radius,health,isSpeedRandom*(fmodf(rand(),speed)));
+            if (isPositionRandom){
+                float x=fmodf(rand(),region.width-radius*2)+region.left+radius;
+                float y=fmodf(rand(),region.height-radius*2)+region.top+radius;
+                temp->setPosition(x,y);
+            } else {temp->setPosition(pos);}
             temp->setOrigin(radius,radius);
+            temp->setSpeed(speed);
             obstacles.emplace_back(temp);
         }
     }
@@ -305,33 +282,6 @@ public:
         }
     }
 };
-
-//template<typename T>
-//class ObjectList{
-//    static std::vector<T*> objects;
-//    static void addObject(T* new_object){
-//        objects.emplace_back(new_object);
-//    }
-//    static void removeObstacle(Obstacle* object){
-//        for (auto it=objects.begin();it!=objects.end();it++){
-//            if (*it==object){
-//                delete object;
-//                objects.erase(it);
-//                break;
-//            }
-//        }
-//    }
-//    int obstacleCount(){return objects.size();}
-//    void update(sf::Time& time){
-//        for (auto& x:objects){
-//            x->update(time);
-//            if(x->overdue_) {removeObstacle(x);}
-//        }
-//    }
-//};
-
-
-
 
 class Target: public sf::CircleShape{
     int health_;
