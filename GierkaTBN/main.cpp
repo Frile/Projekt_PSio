@@ -50,10 +50,10 @@ bool checkForCollision(const Bullet* bullet, const Obstacle* obstacle){
     return false;
 }
 
-void updateCollisions(BulletList& bullets, ObstacleList& obstacles){
-    for (auto &b: bullets.bullets){
+void updateCollisions(BulletList* bullets, ObstacleList* obstacles){
+    for (auto &b: bullets->bullets){
         bool collision=0;
-        for (auto &o:obstacles.obstacles){
+        for (auto &o:obstacles->obstacles){
             collision=checkForCollision(b,o);
             if (collision){
                 o->terminate();
@@ -61,6 +61,7 @@ void updateCollisions(BulletList& bullets, ObstacleList& obstacles){
         }
         if(collision){b->terminate();}
     }
+
 }
 
 
@@ -71,7 +72,8 @@ void updateCollisions(BulletList& bullets, ObstacleList& obstacles){
 int main() {
 //    tworzymy okno
     sf::RenderWindow window(sf::VideoMode(window_width,window_height), "My window",sf::Style::Close);
-    //window.setFramerateLimit(100);
+    window.setFramerateLimit(100);
+
     sf::FloatRect window_rect({0,0},{window_width,window_height});
 
     std::vector<BulletList*> BulletListIndex(0);
@@ -82,9 +84,6 @@ int main() {
     ObstacleList przeszkody1(window_rect);
     ObstacleListIndex.emplace_back(&przeszkody1);
 
-    for (int i=1; i<=10;i++){
-        ObstacleListIndex[0]->obstacles.emplace_back(ObstacleList::randomObstacle(40));
-    }
 
 //    tworzymy obiekty jakies
     sf::CircleShape orbitLine(orbit_radius);
@@ -113,6 +112,11 @@ int main() {
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed||(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::Escape))
                 window.close();
+            if(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::J){
+                std::cout<<"niice  ";
+                ObstacleListIndex[0]->randomObstacles(window_rect);
+                std::cout<<ObstacleListIndex[0]->obstacleCount()<<std::endl;
+            }
         }
     //    obslugujemy eventy
         statek.update(elapsed);
@@ -121,27 +125,26 @@ int main() {
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::B)){statek.setControlMode(GameSettings::Free);}
 
 
-        pociski.update(elapsed);
+        updateCollisions(BulletListIndex[0],ObstacleListIndex[0]);
+        BulletListIndex[0]->update(elapsed);
+        ObstacleListIndex[0]->update(elapsed);
 
     //    czyscimy i rysujemy obiekty
         window.clear(sf::Color::Black);
         window.draw(orbitLine);
 
-        statek.drawShip(window);
-
-
         for (auto list:ObstacleListIndex){
             for (auto obst:list->obstacles){
+//                std::cout<<"przeszkodyy"<<std::endl;
                 window.draw(*obst);
             }
         }
-
         for (auto list:BulletListIndex){
             for (auto bull:list->bullets){
                 window.draw(*bull);
             }
         }
-
+        statek.drawShip(window);
 
     //    wyswietlamy
         window.display();

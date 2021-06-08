@@ -36,10 +36,10 @@ class Bullet: public sf::CircleShape{
     float max_distance_;
     float current_distance_=0;
 public:
-    Bullet(float direction ,const sf::Vector2f& pos,int speed,int power=1,float max_distance=400): CircleShape(10){
+    Bullet(float direction ,const sf::Vector2f& pos,int speed,int power=1, float radius=6, float max_distance=400): CircleShape(radius){
         direction_=direction;
         setPosition(pos);
-        setOrigin(10,10);
+        setOrigin(radius,radius);
         power_=power;
         speed_=speed;
         max_distance_=max_distance;
@@ -114,7 +114,7 @@ class Ship: public sf::CircleShape{
     float speed_aux_;
     float speed_angular_;
     int power_=1;
-    const float min_cooldown_=0.5;
+    const float min_cooldown_=0.1;
     float cooldown_=0;
     float indicator_distance_=40;
     float orbiting_radius_=200;
@@ -266,6 +266,7 @@ public:
 };
 
 class ObstacleList{
+    int max_size=40;
 public:
     sf::Vector2f position_;
     float direction_;
@@ -275,11 +276,17 @@ public:
         region=obszar;
     }
     void addObstacle(Obstacle* new_obstacle){
-        obstacles.emplace_back(new_obstacle);
+        if(obstacleCount()<max_size)obstacles.emplace_back(new_obstacle);
     }
-    static Obstacle* randomObstacle(float radius, int health=1, bool isSpeedRandom=0){
-        Obstacle* temp = new Obstacle(rand()%360,radius,health,isSpeedRandom*(rand()%100));
-        return temp;
+    void randomObstacles(sf::FloatRect& range, int n=1, float radius=25, int health=1, bool isSpeedRandom=0){
+        for(int i=0;i<n;i++){
+            Obstacle* temp = new Obstacle(rand()%360,radius,health,isSpeedRandom*(rand()%100));
+            float x=fmodf(rand(),range.width-radius*2)+range.left+radius;
+            float y=fmodf(rand(),range.height-radius*2)+range.top+radius;
+            temp->setPosition(x,y);
+            temp->setOrigin(radius,radius);
+            obstacles.emplace_back(temp);
+        }
     }
     void removeObstacle(Obstacle* obstacle){
         for (auto it=obstacles.begin();it!=obstacles.end();it++){
