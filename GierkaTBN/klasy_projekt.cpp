@@ -14,7 +14,7 @@ sf::Vector2f operator* (float a, sf::Vector2f b){
     return sf::Vector2f{b.x*a,b.y*a};
 }
 
-enum class GameSettings{
+enum class ShipMovementMode{
     Rows,Orbit,Free/*,Easy,Medium,Hard,Fast,Slow*/
 };
 
@@ -59,9 +59,11 @@ public:
         }
     }
     void terminate(){overdue=true;}
+    int power(){return power_;}
 };
 
 class BulletList{
+
 public:
     BulletList(sf::FloatRect &obszar):region(obszar){};
     std::vector<Bullet*> bullets;
@@ -97,16 +99,18 @@ class Ship: public sf::CircleShape{
     float cooldown_=0;
     float indicator_distance_=40;
     float orbiting_radius_=200;
+    bool auto_shooting=false;
+    float bullet_velocity_=100;
     std::vector<BulletList*>* bullet_storage_;
     sf::Vector2f orbiting_point_;
     Dot indicator_;
     Dot center_;
-    GameSettings mode_=GameSettings::Free;
+    ShipMovementMode mode_=ShipMovementMode::Free;
 
     void move(sf::Time& deltaT, bool shootsOutsideOrbit=false){
-        if(mode_==GameSettings::Free){
+        if(mode_==ShipMovementMode::Free){
             float horizontal=0,vertical=0;
-            float shift_mod=1+0.5*sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift);
+            float shift_mod=1+0.7*sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift);
             horizontal=shift_mod*(speed_main_*deltaT.asSeconds())*(sf::Keyboard::isKeyPressed(sf::Keyboard::D)-sf::Keyboard::isKeyPressed(sf::Keyboard::A));
             vertical=shift_mod*(speed_aux_*deltaT.asSeconds())*(sf::Keyboard::isKeyPressed(sf::Keyboard::S)-sf::Keyboard::isKeyPressed(sf::Keyboard::W));
 
@@ -114,10 +118,10 @@ class Ship: public sf::CircleShape{
             center_.move(horizontal,vertical);
             indicator_.move(horizontal,vertical);
         }
-        if(mode_==GameSettings::Orbit){
+        if(mode_==ShipMovementMode::Orbit){
             float angle=0;
-            float shift_mod=1+0.5*sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift);
-            angle=getRotation()+shift_mod*(sf::Keyboard::isKeyPressed(sf::Keyboard::D)-sf::Keyboard::isKeyPressed(sf::Keyboard::A))*deltaT.asSeconds()*speed_angular_*0.5;
+            float shift_mod=1+0.7*sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift);
+            angle=getRotation()+shift_mod*(sf::Keyboard::isKeyPressed(sf::Keyboard::D)-sf::Keyboard::isKeyPressed(sf::Keyboard::A))*deltaT.asSeconds()*speed_angular_;
 
             sf::CircleShape::setRotation(angle);
             setPosition(orbiting_point_+sf::Vector2f{orbiting_radius_*cosf(toRad(angle)),orbiting_radius_*sinf(toRad(angle))});
@@ -132,12 +136,12 @@ class Ship: public sf::CircleShape{
     }
     BulletList* bulletlistChoose(std::vector<BulletList*>* index){
         for(auto it=index->begin();it!=index->end();it++){
-            if((*it)->region.contains(this->getPosition())){return *it;}          //nie wiem czy lepiej niż poniżej
+            if((*it)->region.contains(this->getPosition())){return *it;}
         }
         return nullptr;
     }
 public:
-    Ship(sf::Vector2f pos, std::vector<BulletList*>* shooting_log):CircleShape(30),indicator_(pos),center_(pos){
+    Ship(sf::Vector2f pos, std::vector<BulletList*>* shooting_log):CircleShape(20),indicator_(pos),center_(pos){
         setFillColor({124,215,135});
         setOrigin(30,30);
         setPosition(pos);
@@ -161,13 +165,14 @@ public:
         power_=1;
         setRotation(0);
         cooldown_=0;
+        bullet_velocity_=80;
     }
     void shoot(float speed, bool shootsOutsideOrbit=false){                            //ez
         if(cooldown_>min_cooldown_){
             auto dest=bulletlistChoose(bullet_storage_);
             if(dest!=nullptr){
                 cooldown_=0;
-                Bullet* temp=new Bullet(getRotation()*(1-2*(mode_==GameSettings::Orbit))+180*(!shootsOutsideOrbit)*(mode_==GameSettings::Orbit),indicator_.getPosition(),speed,power_);
+                Bullet* temp=new Bullet(getRotation()*(1-2*(mode_==ShipMovementMode::Orbit))+180*(!shootsOutsideOrbit)*(mode_==ShipMovementMode::Orbit),indicator_.getPosition(),speed,power_);
                 dest->bullets.emplace_back(temp);
             }
         }
@@ -175,9 +180,9 @@ public:
     void update(sf::Time& deltaT, bool shootsOutsideOrbit=false){                                      //ez
         if (cooldown_<min_cooldown_) cooldown_+=deltaT.asSeconds();
         move(deltaT,shootsOutsideOrbit);
-        if (mode_==GameSettings::Free)rotate(deltaT);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)){
-            shoot(200,shootsOutsideOrbit);
+        if (mode_==ShipMovementMode::Free)rotate(deltaT);
+        if (auto_shooting||sf::Keyboard::isKeyPressed(sf::Keyboard::Space)){
+            shoot(bullet_velocity_,shootsOutsideOrbit);
         }
 
     }
@@ -188,7 +193,8 @@ public:
     }
     void setPower(int new_power){power_=new_power;}     //ez
     void setHitbox(int radius){setRadius(radius);}      //ez
-    void setControlMode(GameSettings mode){mode_=mode;}     //ez
+    void setControlMode(ShipMovementMode mode){mode_=mode;}     //ez
+    void setBulletSpeed(float newspeed){bullet_velocity_=newspeed;}
     void drawShip(sf::RenderWindow& window){
         window.draw(*this);
         window.draw(indicator_);
@@ -204,6 +210,7 @@ public:
 
     }
     void setBulletStorage(std::vector<BulletList*>* storage){bullet_storage_=storage;}
+    void setShootingMode(bool is_auto){auto_shooting=is_auto;}
 };
 
 class Obstacle: public sf::CircleShape{
@@ -213,13 +220,22 @@ class Obstacle: public sf::CircleShape{
     float current_distance_=0;
     int health_=1;
 public:
-    Obstacle(float direction, float radius, int health=1, float speed=0,float max_distance=400):sf::CircleShape(radius){
+    int given_bonus_;
+    Obstacle(float direction, float radius, int health=1, float speed=0,float max_distance=400, int bonus=0):sf::CircleShape(radius){
         speed_=speed;
         max_distance_=max_distance;
         direction_=direction;
         health_=health;
         setOrigin(radius,radius);
-        setFillColor(sf::Color::Cyan);
+        if(bonus==0){
+            setFillColor(sf::Color::Cyan);
+        }else if (bonus==1){
+            setFillColor(sf::Color::Magenta);
+            std::cout<<"robi kolorekkkkkkkk";
+        }else{
+            setFillColor(sf::Color{200,30,5});
+        }
+        given_bonus_=bonus;
     };
     void hit(float strength){
         health_-=strength;
@@ -235,7 +251,12 @@ public:
         }
     }
     bool overdue_=false;
-    void terminate(){overdue_=true;}
+    bool terminate(){
+        if(health_<1||current_distance_>=max_distance_){
+            overdue_=true;
+            return true;
+        }else return false;
+    }
     void setSpeed(float speed){speed_=speed;}
 };
 
@@ -252,7 +273,7 @@ public:
     void addObstacle(Obstacle* new_obstacle){
         if(obstacleCount()<max_size)obstacles.emplace_back(new_obstacle);
     }
-    void randomObstacles(int n=1, float speed=0, bool isSpeedRandom=0, float angle=0, bool isAngleRandom=0, sf::Vector2f pos={0,0}, bool isPositionRandom=1,  int health=1, float radius=25){
+    void randomObstacles(int n=1, float speed=0, bool isSpeedRandom=0, float angle=0, bool isAngleRandom=0, sf::Vector2f pos={0,0}, bool isPositionRandom=1, int health=1, float radius=25){
         for(int i=0;i<n;i++){
             Obstacle* temp = new Obstacle(isAngleRandom*rand()%360+angle*!isAngleRandom,radius,health,isSpeedRandom*(fmodf(rand(),speed)));
             if (isPositionRandom){
@@ -264,6 +285,24 @@ public:
             temp->setSpeed(speed);
             obstacles.emplace_back(temp);
         }
+    }
+    void randomObstacle_Destination(int region_number_0_3, sf::Vector2f destination, float speed, float distance,  int health=1, float radius=25){
+        int angle=rand()%70+10+90*(region_number_0_3-2);
+        int powerup=rand()%20;
+        Obstacle* temp;
+        if (powerup>2){
+            temp = new Obstacle(angle,radius,health,speed,distance,0);
+            std::cout<<"normal"<<std::endl;
+        }else if(powerup==1){
+            temp = new Obstacle(angle,radius,2,1.5*speed,distance,1);
+            std::cout<<"power-up--------"<<std::endl;
+        }else{
+            temp = new Obstacle(angle,radius,3,speed,distance,-2);
+            std::cout<<"baddieboy >:D"<<std::endl;
+        }
+        temp->setOrigin(radius,radius);
+        temp->setPosition(destination+sf::Vector2f(cosf(toRad(angle+180))*distance,-sinf(toRad(angle+180))*distance));
+        obstacles.emplace_back(temp);
     }
     void removeObstacle(Obstacle* obstacle){
         for (auto it=obstacles.begin();it!=obstacles.end();it++){
@@ -292,3 +331,5 @@ public:
     void healthUp(int change=1){health_+=change;}
     void healthDown(int change=1){health_-=change;}
 };
+
+
