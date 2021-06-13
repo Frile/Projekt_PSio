@@ -231,9 +231,8 @@ public:
             setFillColor(sf::Color::Cyan);
         }else if (bonus==1){
             setFillColor(sf::Color::Magenta);
-            std::cout<<"robi kolorekkkkkkkk";
-        }else{
-            setFillColor(sf::Color{200,30,5});
+        }else if (bonus==-1){
+            setFillColor(sf::Color{200,60,20});
         }
         given_bonus_=bonus;
     };
@@ -251,11 +250,18 @@ public:
         }
     }
     bool overdue_=false;
-    bool terminate(){
-        if(health_<1||current_distance_>=max_distance_){
+    int terminate(){
+        if(health_<1){
             overdue_=true;
-            return true;
-        }else return false;
+            std::cout<<"              zabita  "<<std::endl;
+            return 1;
+        }else
+        if(current_distance_>=max_distance_){
+            overdue_=true;
+            std::cout<<" doleciala            "<<std::endl;
+            return 2;
+        }
+        else return  0;;
     }
     void setSpeed(float speed){speed_=speed;}
 };
@@ -292,13 +298,13 @@ public:
         Obstacle* temp;
         if (powerup>2){
             temp = new Obstacle(angle,radius,health,speed,distance,0);
-            std::cout<<"normal"<<std::endl;
+//            std::cout<<"normal"<<std::endl;
         }else if(powerup==1){
             temp = new Obstacle(angle,radius,2,1.5*speed,distance,1);
-            std::cout<<"power-up--------"<<std::endl;
+//            std::cout<<"power-up--------"<<std::endl;
         }else{
-            temp = new Obstacle(angle,radius,3,speed,distance,-2);
-            std::cout<<"baddieboy >:D"<<std::endl;
+            temp = new Obstacle(angle,radius,3,speed,distance,-1);
+//            std::cout<<"baddieboy >:D"<<std::endl;
         }
         temp->setOrigin(radius,radius);
         temp->setPosition(destination+sf::Vector2f(cosf(toRad(angle+180))*distance,-sinf(toRad(angle+180))*distance));

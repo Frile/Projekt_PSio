@@ -85,8 +85,13 @@ struct SessionData{
                     collision=checkForCollision(b,o);
                     if (collision){
                         o->hit(b->power());
-                        generation_modifier_+=10*o->given_bonus_;
-                        if (o->terminate())score+=100+400*o->given_bonus_;
+                        int temp=o->terminate();
+                        if (temp!=0){
+                            std::cout<<generation_modifier_<<" - "<<temp<<std::endl;
+                            if(temp==1)generation_modifier_+=5*o->given_bonus_;
+                            else generation_modifier_+=10*o->given_bonus_;
+                            score+=100+400*(o->given_bonus_==1);
+                        }
                         break;
                     }
                 }
