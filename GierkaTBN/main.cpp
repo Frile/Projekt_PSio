@@ -9,16 +9,11 @@
 #endif
 
 
-
-//klasa target ktora reaguje na obstacle, hitbox obiektu jest wiekszy niz sama planeta w srodku?
 /* Jakie kategorie?
- * -karta tytułowa, press any key albo wyjdź od razu? :(
  * -głowne menu z ustawieniami na boku
- * -gameplay na orbicie
  * -win/lose, można w sumie na jednej karcie dać
  *
  */
-
 
 
 const float window_width=800;
@@ -28,6 +23,12 @@ sf::Vector2f orbit_position=window_center;
 const float orbit_radius=100;
 const float pi=3.14159;
 enum class ShipMovementMode;
+enum class GameState;
+struct SessionData;
+class Button;
+class Button_Gamestate;
+class Button_MovementMode;
+
 
 sf::Vector2f operator*(float,sf::Vector2f);
 float toRad(float degrees){
@@ -37,124 +38,6 @@ float toDeg(float radians){
     return radians/pi*180;
 }
 
-
-enum class GameState{
-        Titlecard, SettingsMenu, Gameplay, Lose, Close
-    };
-
-struct SessionData{
-    using BulletIndexType=std::vector<BulletList*>;
-    using ObstacleIndexType=std::vector<ObstacleList*>;
-    static ShipMovementMode movemode;
-    static GameState gamestate;
-    static int score;
-    static int target_health_;
-    static sf::Vector2f target_position_;
-    static float target_radius_;
-    static BulletIndexType* current_bullet_index;
-    static ObstacleIndexType* current_obstacle_index;
-    static sf::Clock generation_timer_;
-    static bool game_is_on_;
-    static float obstacle_time_;
-    static float obstacle_frequency_;
-    static float generation_modifier_;
-    static float start_difficulty_modifier_;
-    static void resetGame(){
-        movemode=ShipMovementMode::Orbit;
-        score=0;
-        if(current_bullet_index!=nullptr)for (auto b:*current_bullet_index){
-            b->bullets.erase(b->bullets.begin(),b->bullets.end());
-        }
-        if(current_obstacle_index!=nullptr)for (auto o:*current_obstacle_index){
-            o->obstacles.erase(o->obstacles.begin(),o->obstacles.end());
-        }
-        obstacle_frequency_=1;
-        generation_timer_.restart();
-        obstacle_time_=0;
-        generation_modifier_=0;
-        target_health_=3;
-    }
-    static bool endOfGameCheck(){
-        if(target_health_<=0&&game_is_on_){
-            resetGame();
-            std::cout<<"\n\nFrajerrrrr!!!\n\n\n";
-            setGamestate(GameState::Titlecard);
-        }
-        return 1;
-    }
-    static void gameStart(){
-        if(gamestate==GameState::Gameplay&&!game_is_on_){
-            game_is_on_=true;
-            generation_timer_.restart();
-        }
-    }
-    static void setMovementMode(ShipMovementMode mode){movemode=mode;}
-    static void setGamestate(GameState state){gamestate=state;}
-    static void setBulletIndex(std::vector<BulletList*>* bullet_index){current_bullet_index=bullet_index;}
-    static void setObstacleIndex(std::vector<ObstacleList*>* obst_index){current_obstacle_index=obst_index;}
-    static void updateCollisions(sf::Time& elapsed){
-        for (size_t i=0; i<(current_bullet_index->size());i++){
-            BulletList* bullets=(*current_bullet_index)[i];
-            ObstacleList* obstacles=(*current_obstacle_index)[i];
-            for (auto &b: bullets->bullets){
-                bool collision=0;
-                for (auto &o:obstacles->obstacles){
-                    collision=checkForCollision(b,o);
-                    if (collision){
-                        o->hit(b->power());
-                        b->terminate();
-                    }
-                    int temp=o->terminate();
-                    if (temp!=0){
-                        generation_modifier_+=5*(o->given_bonus_==1);
-                        score+=100+300*(o->given_bonus_==1);
-//                        std::cout<<"shot "<<temp<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<std::endl;
-                    break;
-                    }
-                }
-            }
-            //osobno kolizje z targetem >_<
-            for (auto &o:obstacles->obstacles){
-                float dist=o->getRadius()+target_radius_;
-                dist*=dist;
-                float x=target_position_.x-o->getPosition().x;
-                float y=target_position_.y-o->getPosition().y;
-                if(dist>=x*x+y*y){
-                    o->terminate(1);
-                    generation_modifier_-=10*(o->given_bonus_==-1);
-//                    std::cout<<"natural "<<code<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<"  "<<target_health_<<"  "<<obstacle_frequency_<<std::endl;
-                    target_health_-=(o->given_bonus_==0);
-                }
-            }
-            bullets->update(elapsed);
-            obstacles->update(elapsed);
-        }
-    }
-    static void generateObstacles(sf::Time& elapsed){
-//        std::cout<<generation_timer_.getElapsedTime().asSeconds()<<std::endl;
-        obstacle_time_+=elapsed.asSeconds();
-        if (obstacle_time_>1/obstacle_frequency_){
-            obstacle_time_-=1/obstacle_frequency_;
-            int part=rand()%current_obstacle_index->size();
-            (*current_obstacle_index)[part]->randomObstacle_Destination(part,window_center,20,520,1);
-        }
-    }
-    static void updateSession(sf::Time& elapsed){
-        float temp=generation_timer_.getElapsedTime().asSeconds();
-        obstacle_frequency_=expf(fmaxf(temp-generation_modifier_,0)/69)+start_difficulty_modifier_;
-//        std::cout<<temp<<"  "<<generation_modifier_<<"  "<<obstacle_frequency_<<std::endl;
-        updateCollisions(elapsed);
-        generateObstacles(elapsed);
-    }
-private:
-    static bool checkForCollision(const Bullet* bullet, const Obstacle* obstacle){
-        auto temp = bullet->getPosition()-obstacle->getPosition();
-        float bruh = temp.x*temp.x+temp.y*temp.y;           //x^2+y^2=dist^2 (...??)
-        float dist=bullet->getRadius()+obstacle->getRadius();   //dist^2, porównanko
-        if (bruh<dist*dist) {return true;}
-        return false;
-    }
-}session_flags;
 
 ShipMovementMode SessionData::movemode=ShipMovementMode::Orbit;
 GameState SessionData::gamestate=GameState::Titlecard;
@@ -167,67 +50,16 @@ float SessionData::obstacle_time_=0;
 float SessionData::generation_modifier_=0;
 sf::Vector2f SessionData::target_position_=window_center;
 float SessionData::target_radius_=orbit_radius+20;
-int SessionData::target_health_=3;
+int SessionData::target_health_=1;
 bool SessionData::game_is_on_=false;
 float SessionData::start_difficulty_modifier_=0;
-
-
-class Button:public sf::RectangleShape{
-protected:
-    sf::Text text_params_;
-    Dot origin_;
-    bool state_;
-    SessionData session_handle_;
-public:
-    Button(sf::Vector2f position, std::string text, sf::Font* font, int fontsize=30):text_params_(text,*font,fontsize),origin_(position){
-        text_params_.setPosition(position);
-        auto temp=text_params_.getGlobalBounds();
-//        setOrigin(sf::Vector2f{10,0});
-        setPosition(position);
-        setSize(sf::Vector2f(temp.width+20,temp.height+20));
-        text_params_.setFillColor(sf::Color::Cyan);
-    }
-    void draw(sf::RenderTarget& target){
-        target.draw(*this);
-        target.draw(text_params_);
-        target.draw(origin_);
-    }
-    virtual void update_state(sf::RenderWindow& target){
-        state_=sf::Mouse::isButtonPressed(sf::Mouse::Left)&&getGlobalBounds().contains(target.mapPixelToCoords(sf::Mouse::getPosition(target)));
-//        std::cout<<state_;
-    };
-};
-
-class Button_Gamestate: public Button{
-    GameState state_it_sets_;
-public:
-    Button_Gamestate(sf::Vector2f position, std::string text, sf::Font* font,GameState its_state, int fontsize=30):Button(position,text,font,fontsize){state_it_sets_=its_state;};
-    void execute(sf::RenderWindow& target){
-        update_state(target);
-        if(state_){
-            session_handle_.setGamestate(state_it_sets_);
-        }
-    }
-};
-
-class Button_MovementMode:public Button{
-    ShipMovementMode movement_it_sets_;
-public:
-    Button_MovementMode(sf::Vector2f position, std::string text, sf::Font* font,ShipMovementMode its_mode, int fontsize=30):Button(position,text,font,fontsize){movement_it_sets_=its_mode;}
-    void execute(sf::RenderWindow& target){
-        update_state(target);
-        if(state_){
-            session_handle_.setMovementMode(movement_it_sets_);
-        }
-    }
-};
-
+sf::Vector2f SessionData::window_center_=window_center;
 
 
 
 int main() {
 //    tworzymy okno
-    sf::RenderWindow window(sf::VideoMode(window_width,window_height), "My window",sf::Style::Close);
+    sf::RenderWindow window(sf::VideoMode(window_width,window_height), "PSiO Gierka TBN",sf::Style::Close);
     window.setFramerateLimit(100);
 
     sf::FloatRect window_rect({0,0},{window_width,window_height});
@@ -235,7 +67,6 @@ int main() {
 
     std::vector<BulletList*> BulletListIndex_Orbit(0);
     std::vector<ObstacleList*> ObstacleListIndex_Orbit(0); //ekran podzielony na cwiartki jak w matematyce i ii iii iv
-
     std::vector<BulletList*> BulletList_Free(0);
     std::vector<ObstacleList*> ObstacleList_Free(0); //caly ekran to 1 obszar
 
@@ -245,15 +76,17 @@ int main() {
         window.close();
     }
 
-    Button_Gamestate start_button(sf::Vector2f{100,200},"Start",&font,GameState::Gameplay);
-    Button_Gamestate menu_button(sf::Vector2f{100, 300},"To Title",&font, GameState::Titlecard);
+    Button_Gamestate start_button("Start",&font,GameState::Gameplay);
+    start_button.setButtonPosition(sf::Vector2f{70,200});
+    Button_Gamestate title_button("To Title",&font,GameState::Titlecard);
+    title_button.setButtonPosition(sf::Vector2f{70, 300});
+    Button_Gamestate menu_button("To Menu",&font, GameState::SettingsMenu);
+    menu_button.setButtonPosition(10,10);
 
-    sf::Text score_count(std::to_string(session_flags.score),font);
-    score_count.setPosition(0,0);
-    score_count.setFillColor({180,90,30});
-    sf::Text health_points(std::to_string(session_flags.target_health_),font);
-    health_points.setPosition(0,45);
-    health_points.setFillColor({200,110,50});
+    CustomNeatText score_count(std::to_string(session_flags.score),font);
+    CustomNeatText health_points(std::to_string(session_flags.target_health_),font);
+    CustomNeatText score_text("Score: ",font);
+    CustomNeatText health_text("Lives: ",font);
 
 
     BulletList bullet_area1(r1);
@@ -313,7 +146,11 @@ int main() {
     //    startowe rzeczy
         sf::Time elapsed=timer.restart();
         sf::Event event;
-        window.clear(sf::Color::Black);
+
+        if(sf::Mouse::isButtonPressed(sf::Mouse::Right)){}//       wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+
+         //czyścimy okno
+        if(session_flags.gamestate!=GameState::Pause)window.clear(sf::Color{11,15,23});
 
         if(session_flags.gamestate==GameState::Titlecard){
             while (window.pollEvent(event)) {
@@ -323,10 +160,14 @@ int main() {
                     session_flags.setGamestate(GameState::SettingsMenu);
                 }
             }
-            sf::Text splash("=press any key=",font);
-            splash.setPosition(350,280);
-            splash.setFillColor(sf::Color::Green);
+            CustomNeatText splash("=press any key=",font);
+            CustomNeatText namecard("TBN Shooter Game", font, 80);
+            namecard.setPosition(80,60);
+            splash.setPosition(280,400);
+            namecard.setScale(1,2);
+
             window.draw(splash);
+            window.draw(namecard);
 
         }
         else if(session_flags.gamestate==GameState::SettingsMenu){
@@ -334,30 +175,59 @@ int main() {
                 if (event.type == sf::Event::Closed)
                     window.close();
              }
-            menu_button.draw(window);
+            title_button.draw(window);
             start_button.draw(window);
-            menu_button.execute(window);
+            title_button.execute(window);
             start_button.execute(window);
-            session_flags.gameStart();
+            if(session_flags.gameStart()){
+                score_text.setPosition(10,0);
+                score_count.setPosition(110,0);
+                health_points.setPosition(110,45);
+                health_text.setPosition(10,45);
+            }
         }
-        else if(session_flags.gamestate==GameState::Lose){}
+        else if(session_flags.gamestate==GameState::Lose){
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed)
+                    window.close();
+             }
+            CustomNeatText namecard("Final score:",font);
+            namecard.setPosition(310,260);
+            score_count.setPosition(370,300);
+            window.draw(namecard);
+            window.draw(score_count);
+            menu_button.setButtonPosition(session_flags.window_center_.x-menu_button.getSize().x/2,350);
+            menu_button.execute(window);
+            menu_button.draw(window);
+        }
+        else if(session_flags.gamestate==GameState::Pause){
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed){
+                    window.close();
+                }
+            }
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::P)){session_flags.gamestate=GameState::Gameplay;}
+        }
         else if(session_flags.gamestate==GameState::Gameplay){
         //    sprawdzamy eventy
             while (window.pollEvent(event)) {
-                if (event.type == sf::Event::Closed||(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::Escape)){
+                if (event.type == sf::Event::Closed){
                     window.close();
                 }
-                if(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::J){
-                    int part=rand()%4;
-                    ObstacleListIndex_Orbit[part]->randomObstacle_Destination(part,window_center,20,520,1);
+                if((event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::Escape)){
+                    session_flags.gamestate=GameState::Pause;
                 }
+//                if(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::J){
+//                    int part=rand()%4;
+//                    ObstacleListIndex_Orbit[part]->randomObstacle_Destination(part,session_flags.window_center_,20,520,1);
+//                }
             }
         //    obslugujemy eventy
             statek.update(elapsed,1);
             session_flags.updateSession(elapsed);
             score_count.setString(std::to_string(session_flags.score));
             health_points.setString(std::to_string(session_flags.target_health_));
-            session_flags.endOfGameCheck();
+            session_flags.game_is_on_=!session_flags.endOfGameCheck();
 
         //    czyscimy i rysujemy obiekty
             window.draw(orbitLine);
@@ -374,7 +244,9 @@ int main() {
                 }
             }
             statek.drawShip(window);
+            window.draw(score_text);
             window.draw(score_count);
+            window.draw(health_text);
             window.draw(health_points);
 
         }
