@@ -39,7 +39,7 @@ float toDeg(float radians){
 
 
 enum class GameState{
-        Titlecard, SettingsMenu, Gameplay, Win, Lose, Close
+        Titlecard, SettingsMenu, Gameplay, Lose, Close
     };
 
 struct SessionData{
@@ -48,15 +48,19 @@ struct SessionData{
     static ShipMovementMode movemode;
     static GameState gamestate;
     static int score;
+    static int target_health_;
+    static sf::Vector2f target_position_;
+    static float target_radius_;
     static BulletIndexType* current_bullet_index;
     static ObstacleIndexType* current_obstacle_index;
     static sf::Clock generation_timer_;
+    static bool game_is_on_;
     static float obstacle_time_;
     static float obstacle_frequency_;
     static float generation_modifier_;
-    static void reset(){
+    static float start_difficulty_modifier_;
+    static void resetGame(){
         movemode=ShipMovementMode::Orbit;
-        gamestate=GameState::Titlecard;
         score=0;
         if(current_bullet_index!=nullptr)for (auto b:*current_bullet_index){
             b->bullets.erase(b->bullets.begin(),b->bullets.end());
@@ -64,12 +68,25 @@ struct SessionData{
         if(current_obstacle_index!=nullptr)for (auto o:*current_obstacle_index){
             o->obstacles.erase(o->obstacles.begin(),o->obstacles.end());
         }
-        current_bullet_index=nullptr;
-        current_obstacle_index=nullptr;
         obstacle_frequency_=1;
         generation_timer_.restart();
         obstacle_time_=0;
         generation_modifier_=0;
+        target_health_=3;
+    }
+    static bool endOfGameCheck(){
+        if(target_health_<=0&&game_is_on_){
+            resetGame();
+            std::cout<<"\n\nFrajerrrrr!!!\n\n\n";
+            setGamestate(GameState::Titlecard);
+        }
+        return 1;
+    }
+    static void gameStart(){
+        if(gamestate==GameState::Gameplay&&!game_is_on_){
+            game_is_on_=true;
+            generation_timer_.restart();
+        }
     }
     static void setMovementMode(ShipMovementMode mode){movemode=mode;}
     static void setGamestate(GameState state){gamestate=state;}
@@ -85,17 +102,29 @@ struct SessionData{
                     collision=checkForCollision(b,o);
                     if (collision){
                         o->hit(b->power());
-                        int temp=o->terminate();
-                        if (temp!=0){
-                            std::cout<<generation_modifier_<<" - "<<temp<<std::endl;
-                            if(temp==1)generation_modifier_+=5*o->given_bonus_;
-                            else generation_modifier_+=10*o->given_bonus_;
-                            score+=100+400*(o->given_bonus_==1);
-                        }
-                        break;
+                        b->terminate();
+                    }
+                    int temp=o->terminate();
+                    if (temp!=0){
+                        generation_modifier_+=5*(o->given_bonus_==1);
+                        score+=100+300*(o->given_bonus_==1);
+//                        std::cout<<"shot "<<temp<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<std::endl;
+                    break;
                     }
                 }
-                if(collision){b->terminate();}
+            }
+            //osobno kolizje z targetem >_<
+            for (auto &o:obstacles->obstacles){
+                float dist=o->getRadius()+target_radius_;
+                dist*=dist;
+                float x=target_position_.x-o->getPosition().x;
+                float y=target_position_.y-o->getPosition().y;
+                if(dist>=x*x+y*y){
+                    o->terminate(1);
+                    generation_modifier_-=10*(o->given_bonus_==-1);
+//                    std::cout<<"natural "<<code<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<"  "<<target_health_<<"  "<<obstacle_frequency_<<std::endl;
+                    target_health_-=(o->given_bonus_==0);
+                }
             }
             bullets->update(elapsed);
             obstacles->update(elapsed);
@@ -108,15 +137,15 @@ struct SessionData{
             obstacle_time_-=1/obstacle_frequency_;
             int part=rand()%current_obstacle_index->size();
             (*current_obstacle_index)[part]->randomObstacle_Destination(part,window_center,20,520,1);
-
         }
     }
     static void updateSession(sf::Time& elapsed){
-        obstacle_frequency_=expf(fminf(generation_timer_.getElapsedTime().asSeconds()-generation_modifier_,0)/69);
+        float temp=generation_timer_.getElapsedTime().asSeconds();
+        obstacle_frequency_=expf(fmaxf(temp-generation_modifier_,0)/69)+start_difficulty_modifier_;
+//        std::cout<<temp<<"  "<<generation_modifier_<<"  "<<obstacle_frequency_<<std::endl;
         updateCollisions(elapsed);
         generateObstacles(elapsed);
     }
-    static void setGenerationFrequency(float frequency){obstacle_frequency_=frequency;}
 private:
     static bool checkForCollision(const Bullet* bullet, const Obstacle* obstacle){
         auto temp = bullet->getPosition()-obstacle->getPosition();
@@ -136,6 +165,11 @@ sf::Clock SessionData::generation_timer_=sf::Clock();
 float SessionData::obstacle_frequency_=1;
 float SessionData::obstacle_time_=0;
 float SessionData::generation_modifier_=0;
+sf::Vector2f SessionData::target_position_=window_center;
+float SessionData::target_radius_=orbit_radius+20;
+int SessionData::target_health_=3;
+bool SessionData::game_is_on_=false;
+float SessionData::start_difficulty_modifier_=0;
 
 
 class Button:public sf::RectangleShape{
@@ -191,7 +225,6 @@ public:
 
 
 
-
 int main() {
 //    tworzymy okno
     sf::RenderWindow window(sf::VideoMode(window_width,window_height), "My window",sf::Style::Close);
@@ -218,6 +251,10 @@ int main() {
     sf::Text score_count(std::to_string(session_flags.score),font);
     score_count.setPosition(0,0);
     score_count.setFillColor({180,90,30});
+    sf::Text health_points(std::to_string(session_flags.target_health_),font);
+    health_points.setPosition(0,45);
+    health_points.setFillColor({200,110,50});
+
 
     BulletList bullet_area1(r1);
     BulletListIndex_Orbit.emplace_back(&bullet_area1);
@@ -240,10 +277,17 @@ int main() {
     obstacle_list_temp=ObstacleList(r4);
     ObstacleListIndex_Orbit.emplace_back(&obstacle_list_temp); //moglem w petli generowac ale jedyne co potrzebuje to 4 obszary, na wiecej nie zadziala to po co uogolniac :p
 
+
+
     session_flags.setBulletIndex(&BulletListIndex_Orbit);
     session_flags.setObstacleIndex(&ObstacleListIndex_Orbit);
 
-
+    sf::CircleShape target(SessionData::target_radius_);
+    target.setPosition(SessionData::target_position_);
+    target.setFillColor(sf::Color::Transparent);
+    target.setOrigin(SessionData::target_radius_,SessionData::target_radius_);
+    target.setOutlineColor({20,30,160});
+    target.setOutlineThickness(2);
 
 
 //    tworzymy obiekty jakies
@@ -294,14 +338,11 @@ int main() {
             start_button.draw(window);
             menu_button.execute(window);
             start_button.execute(window);
-
+            session_flags.gameStart();
         }
+        else if(session_flags.gamestate==GameState::Lose){}
         else if(session_flags.gamestate==GameState::Gameplay){
         //    sprawdzamy eventy
-            if(session_flags.movemode==ShipMovementMode::Orbit){
-                session_flags.setBulletIndex(&BulletListIndex_Orbit);
-            }
-
             while (window.pollEvent(event)) {
                 if (event.type == sf::Event::Closed||(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::Escape)){
                     window.close();
@@ -315,9 +356,12 @@ int main() {
             statek.update(elapsed,1);
             session_flags.updateSession(elapsed);
             score_count.setString(std::to_string(session_flags.score));
+            health_points.setString(std::to_string(session_flags.target_health_));
+            session_flags.endOfGameCheck();
 
         //    czyscimy i rysujemy obiekty
             window.draw(orbitLine);
+            window.draw(target);
             for (auto list:ObstacleListIndex_Orbit){
                 for (auto obst:list->obstacles){
     //                std::cout<<"przeszkodyy"<<std::endl;
@@ -331,6 +375,8 @@ int main() {
             }
             statek.drawShip(window);
             window.draw(score_count);
+            window.draw(health_points);
+
         }
         else if(session_flags.gamestate==GameState::Close){
             window.close();

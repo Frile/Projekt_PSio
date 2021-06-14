@@ -10,6 +10,7 @@
 //float distance(float,float,float,float);
 float toRad(float);
 float toDeg(float);
+struct SessionData;
 sf::Vector2f operator* (float a, sf::Vector2f b){
     return sf::Vector2f{b.x*a,b.y*a};
 }
@@ -95,7 +96,7 @@ class Ship: public sf::CircleShape{
     float speed_aux_;
     float speed_angular_;
     int power_=1;
-    const float min_cooldown_=0.1;
+    const float min_cooldown_=0.2;
     float cooldown_=0;
     float indicator_distance_=40;
     float orbiting_radius_=200;
@@ -239,29 +240,25 @@ public:
     void hit(float strength){
         health_-=strength;
     }
-    void update(sf::Time& time){
+    int update(sf::Time& time){
         if (speed_!=0){
             float temp=speed_*time.asSeconds();
             move(cosf(toRad(direction_))*temp,-sinf(toRad(direction_))*temp);  //ez
             current_distance_+=temp;
         }
-        if (current_distance_>=max_distance_||health_<=0){
-            terminate();
-        }
+        return terminate();
     }
     bool overdue_=false;
-    int terminate(){
+    int terminate(bool forced=false){
         if(health_<1){
             overdue_=true;
-            std::cout<<"              zabita  "<<std::endl;
             return 1;
-        }else
-        if(current_distance_>=max_distance_){
+        }
+        if(forced||current_distance_>=max_distance_){
             overdue_=true;
-            std::cout<<" doleciala            "<<std::endl;
             return 2;
         }
-        else return  0;;
+        return  0;
     }
     void setSpeed(float speed){speed_=speed;}
 };
