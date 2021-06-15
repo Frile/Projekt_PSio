@@ -168,7 +168,6 @@ public:
         indicator_.move(40,0);
         bullet_storage_=shooting_log;
     }
-    float radius_2_=900;
     void resetStats(){
         speed_angular_=0;
         speed_aux_=0;
@@ -179,6 +178,7 @@ public:
         bullet_velocity_=80;
     }
     void shoot(float speed, bool shootsOutsideOrbit=false){                            //ez
+        std::cout<<"pew pew"<<std::endl;
         if(cooldown_>min_cooldown_){
             auto dest=bulletlistChoose(bullet_storage_);
             if(dest!=nullptr){
@@ -343,52 +343,33 @@ public:
 };
 
 struct SessionData{
-    using BulletIndexType=std::vector<BulletList*>;
-    using ObstacleIndexType=std::vector<ObstacleList*>;
-    static BulletIndexType* current_bullet_index;
-    static ObstacleIndexType* current_obstacle_index;
     static sf::Font font;
-    const static sf::Color main_color;
-    const static sf::Color secondary_color;
-    static sf::Clock generation_timer_;
-    static sf::Clock timer;
-    static sf::Vector2f window_center_;
+    const static sf::Color main_color;                  //jasniejszy czerwony taki dla tekstu
+    const static sf::Color secondary_color;             //ceimny czrwony taki
+    static sf::Clock generation_timer_;                 //zegar do generowania frequency
+    static sf::Clock timer;                             //odmierza czas klatki deltaT/elapsed
+    static sf::Vector2f window_center_;                 //elegancko przechowane wymiary okna
     static sf::Vector2f target_position_;
     static bool game_is_on_;
     static bool pause_is_on_;
-    static ShipMovementMode movemode;
-    static GameState gamestate;
-    static int score;
-    static int target_health_;
-    static float target_radius_;
-    static float obstacle_time_;
-    static float obstacle_frequency_;
-    static float generation_modifier_;
-    static float start_difficulty_modifier_;
-    static void resetGame(){
-        movemode=ShipMovementMode::Orbit;
-        score=0;
-        if(current_bullet_index!=nullptr)for (auto b:*current_bullet_index){
-            b->bullets.erase(b->bullets.begin(),b->bullets.end());
-        }
-        if(current_obstacle_index!=nullptr)for (auto o:*current_obstacle_index){
-            o->obstacles.erase(o->obstacles.begin(),o->obstacles.end());
-        }
-        obstacle_frequency_=1;
-        generation_timer_.restart();
-        obstacle_time_=0;
-        generation_modifier_=0;
-        target_health_=3;
-    }
-    static bool endOfGameCheck(bool forced=false){
+    static ShipMovementMode movemode;                   //jak sie statek rusza
+    static GameState gamestate;                         //obecny stan gry
+    static int score;                                   //no wynik, normalne i czerwone 100, fioletowe 500
+    static int target_health_;                          //ile hp mamy
+    static float target_radius_;                        //dystans na jakim obstacle zabiraja hp
+    static float obstacle_frequency_;                   //wynik funkcji, mowi ile/s generowac ma obstacle
+    static float generation_modifier_;                  //modyfikuje x funkcji generujacej obstacle_frequency_, dodatni zmniejsza ujemny zwieksza f(x)
+    static float start_difficulty_modifier_;            //ile plasko jest dodawane do obstacle_frequency_
+
+    static bool endOfGameCheck(bool forced=false){      //konczy gre, ustawia stan gry i czysci
         if(forced||(target_health_<=0&&game_is_on_)){
             resetGame();
-            setGamestate(GameState::Lose);
+            gamestate=GameState::Lose;
             return 1;
         }
         return 0;
     }
-    static bool gameStartTrigger(){
+    static bool gameStartTrigger(){                     //zaczyna gre
         if(gamestate==GameState::Gameplay&&!game_is_on_){
             game_is_on_=true;
             generation_timer_.restart();
@@ -397,24 +378,23 @@ struct SessionData{
         }
         return 0;
     }
-    static void pauseOnTrigger(){
+    static void pauseOnTrigger(){                       //odpowiedz na uruchomienie pauzy
         if(gamestate==GameState::Pause&&!pause_is_on_){
             pause_start_=generation_timer_.getElapsedTime().asSeconds();
             pause_is_on_=true;
         }
     }
-    static void endOfPause(bool forced=false){
+    static void endOfPause(bool forced=false){          //odpowiedz na koniec pauzy
         if(forced||(pause_is_on_&&gamestate!=GameState::Pause)){
             pause_time_+=generation_timer_.getElapsedTime().asSeconds()-pause_start_;
         }
 
     }
-    static void setMovementMode(ShipMovementMode mode){movemode=mode;}
-    static void setGamestate(GameState state){gamestate=state;}
     static void setBulletIndex(std::vector<BulletList*>* bullet_index){current_bullet_index=bullet_index;}
     static void setObstacleIndex(std::vector<ObstacleList*>* obst_index){current_obstacle_index=obst_index;}
-    static void updateCollisions(sf::Time& elapsed){
+    static void updateCollisions(sf::Time& elapsed){    //to jest bydle, najpierw sprawdza kolizje obiektow, updateuje wynik ich polozenie i hp, a potem od nowa sprawdza ktore uderzyly w target i zadaly nam hp, wprowadza ich bonusy w zycie
         for (size_t i=0; i<(current_bullet_index->size());i++){
+            //kolizje pocisk-obstacle
             BulletList* bullets=(*current_bullet_index)[i];
             ObstacleList* obstacles=(*current_obstacle_index)[i];
             for (auto &b: bullets->bullets){
@@ -455,7 +435,7 @@ struct SessionData{
             obstacles->update(elapsed);
         }
     }
-    static void generateObstacles(sf::Time& elapsed){
+    static void generateObstacles(sf::Time& elapsed){   //losuje gdzie obstacle bedzie na podstawie tego czy juz nadszedl na to czas (obstacle_time_)
 //        std::cout<<generation_timer_.getElapsedTime().asSeconds()<<std::endl;
         obstacle_time_+=elapsed.asSeconds();
         if (obstacle_time_>1/obstacle_frequency_){
@@ -464,19 +444,40 @@ struct SessionData{
             (*current_obstacle_index)[part]->randomObstacle_Destination(part,window_center_,20,520,1);
         }
     }
-    static void updateSession(sf::Time& elapsed){
+    static void updateSession(sf::Time& elapsed){       //update wszystikego, wszystkie listy jak i tez timer od frequency
         float temp=generation_timer_.getElapsedTime().asSeconds();
         if(gamestate!=GameState::Pause){
-            obstacle_frequency_=expf(fmaxf(temp-generation_modifier_-pause_time_,0)/69)+start_difficulty_modifier_;
+            obstacle_frequency_=expf(fmaxf(temp-generation_modifier_-pause_time_,0)/69)+start_difficulty_modifier_; //exponential
+//            obstacle_frequency_=1/20*fmaxf(temp-generation_modifier_-pause_time_,0)+start_difficulty_modifier_; //linear
 //            std::cout<<"czas zegara: "<<temp<<" | modifier: "<<generation_modifier_<<" | frequency: "<<obstacle_frequency_<<" | czas gry: "<<temp-pause_time_<<" | score: "<<score<<std::endl;
             updateCollisions(elapsed);
             generateObstacles(elapsed);
         }
     }
 private:
+    using BulletIndexType=std::vector<BulletList*>;
+    using ObstacleIndexType=std::vector<ObstacleList*>;
+    static BulletIndexType* current_bullet_index;
+    static ObstacleIndexType* current_obstacle_index;
     static float pause_start_;
-    static float pause_time_;
-    static bool checkForCollision(const Bullet* bullet, const Obstacle* obstacle){
+    static float pause_time_;                           //calkowity czas spedzony w grze ale w pauzie, jest odejmowany zeby nie zepsuc funkcji
+    static float obstacle_time_;                        //odstep pomiedzy stworzeniem obstacle
+    static void resetGame(){                            //zeruje flagi itp
+        movemode=ShipMovementMode::Orbit;
+        score=0;
+        if(current_bullet_index!=nullptr)for (auto b:*current_bullet_index){
+            b->bullets.erase(b->bullets.begin(),b->bullets.end());
+        }
+        if(current_obstacle_index!=nullptr)for (auto o:*current_obstacle_index){
+            o->obstacles.erase(o->obstacles.begin(),o->obstacles.end());
+        }
+        obstacle_frequency_=1;
+        generation_timer_.restart();
+        obstacle_time_=0;
+        generation_modifier_=0;
+        target_health_=3;
+    }
+    static bool checkForCollision(const Bullet* bullet, const Obstacle* obstacle){      //sparwdza czy dwa obiekty koliduja ze soba, ez
         auto temp = bullet->getPosition()-obstacle->getPosition();
         float bruh = temp.x*temp.x+temp.y*temp.y;           //x^2+y^2=dist^2 (...??)
         float dist=bullet->getRadius()+obstacle->getRadius();   //dist^2, porównanko
@@ -536,7 +537,7 @@ public:
     bool execute(sf::RenderWindow& target){
         update_state(target);
         if(state_){
-            session_handle_.setGamestate(state_it_sets_);
+            session_handle_.gamestate=state_it_sets_;
         }
         return state_;
     }
@@ -549,7 +550,7 @@ public:
     void execute(sf::RenderWindow& target){
         update_state(target);
         if(state_){
-            session_handle_.setMovementMode(movement_it_sets_);
+            session_handle_.movemode=movement_it_sets_;
         }
     }
 };

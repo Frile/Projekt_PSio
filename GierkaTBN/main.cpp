@@ -103,7 +103,6 @@ int main() {
     Button_Gamestate title_button("To Title",&session_flags.font,GameState::Titlecard);
     title_button.setButtonPosition(sf::Vector2f{70, 300});
     Button_Gamestate menu_button("To Menu",&session_flags.font, GameState::SettingsMenu);
-    menu_button.setButtonPosition(10,10);
     Button_Gamestate quit_button("Quit",&session_flags.font,GameState::Close);
 
     //labelki generujemy textboxy wszelkie
@@ -181,7 +180,7 @@ int main() {
                 if (event.type == sf::Event::Closed||(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::Escape))
                     window.close();
                 if(event.type==sf::Event::KeyPressed&&!(event.key.code==sf::Keyboard::Escape)){
-                    session_flags.setGamestate(GameState::SettingsMenu);
+                    session_flags.gamestate=GameState::SettingsMenu;
                 }
             }
             CustomNeatText splash("=press any key=",session_flags.font);
@@ -203,9 +202,9 @@ int main() {
             start_button.draw(window);
             title_button.execute(window);
             start_button.execute(window);
+            quit_button.setButtonPosition(70,400);
             quit_button.draw(window);
             quit_button.execute(window);
-            quit_button.setButtonPosition(70,400);
             if(session_flags.gameStartTrigger()){
                 score_text.setPosition(10,0);
                 health_points.setPosition(110,45);
