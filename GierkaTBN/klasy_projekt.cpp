@@ -301,12 +301,12 @@ public:
     }
     void randomObstacle_Destination(int region_number_0_3, sf::Vector2f destination, float speed, float distance,  int health=1, float radius=25){
         int angle=rand()%70+10+90*(region_number_0_3-2);
-        int powerup=rand()%20;
+        int powerup=rand()%25;
         Obstacle* temp;
-        if (powerup>2){
+        if (powerup>4){
             temp = new Obstacle(angle,radius,health,speed,distance,0);
 //            std::cout<<"normal"<<std::endl;
-        }else if(powerup==1){
+        }else if(powerup>2){
             temp = new Obstacle(angle,radius,2,1.5*speed,distance,1);
 //            std::cout<<"power-up--------"<<std::endl;
         }else{
@@ -343,28 +343,28 @@ public:
 };
 
 struct SessionData{
+    using BulletIndexType=std::vector<BulletList*>;
+    using ObstacleIndexType=std::vector<ObstacleList*>;
+    static BulletIndexType* current_bullet_index;
+    static ObstacleIndexType* current_obstacle_index;
     static sf::Font font;
     const static sf::Color main_color;
     const static sf::Color secondary_color;
-    using BulletIndexType=std::vector<BulletList*>;
-    using ObstacleIndexType=std::vector<ObstacleList*>;
+    static sf::Clock generation_timer_;
+    static sf::Clock timer;
+    static sf::Vector2f window_center_;
+    static sf::Vector2f target_position_;
+    static bool game_is_on_;
+    static bool pause_is_on_;
     static ShipMovementMode movemode;
     static GameState gamestate;
     static int score;
     static int target_health_;
-    static sf::Vector2f target_position_;
     static float target_radius_;
-    static BulletIndexType* current_bullet_index;
-    static ObstacleIndexType* current_obstacle_index;
-    static sf::Clock generation_timer_;
-    static sf::Clock timer;
-    static bool game_is_on_;
-    static bool pause_is_on_;
     static float obstacle_time_;
     static float obstacle_frequency_;
     static float generation_modifier_;
     static float start_difficulty_modifier_;
-    static sf::Vector2f window_center_;
     static void resetGame(){
         movemode=ShipMovementMode::Orbit;
         score=0;
@@ -429,10 +429,10 @@ struct SessionData{
                         if(o->overdue_) continue;
                         int temp=o->terminate();
                         if (temp!=0){
-                            generation_modifier_+=7*(o->given_bonus_==1);
+                            generation_modifier_+=9*(o->given_bonus_==1);
                             score+=100+300*(o->given_bonus_==1);
                             target_health_+=o->given_bonus_==1;
-                            std::cout<<"shot "<<temp<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<std::endl;
+//                            std::cout<<"shot "<<temp<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<std::endl;
                         break;
                         }
                     }
@@ -447,7 +447,7 @@ struct SessionData{
                 if(dist>=x*x+y*y){
                     o->terminate(1);
                     generation_modifier_-=5*(o->given_bonus_==-1);
-                    std::cout<<"natural   "<<o->given_bonus_<<"  "<<generation_modifier_<<"  "<<target_health_<<"  "<<obstacle_frequency_<<std::endl;
+//                    std::cout<<"natural   "<<o->given_bonus_<<"  "<<generation_modifier_<<"  "<<target_health_<<"  "<<obstacle_frequency_<<std::endl;
                     target_health_-=(o->given_bonus_==0);
                 }
             }
