@@ -16,7 +16,7 @@ sf::Vector2f operator* (float a, sf::Vector2f b){
 }
 
 enum class ShipMovementMode{
-    Rows,Orbit,Free/*,Easy,Medium,Hard,Fast,Slow*/
+    None,Orbit,Free/*,Easy,Medium,Hard,Fast,Slow*/
 };
 
 enum class GameState{
@@ -76,21 +76,27 @@ public:
     void addBullet(Bullet* new_bullet){     //ok
         bullets.emplace_back(new_bullet);
     }
-    void removeBullet(Bullet* bullet){      //ok
-        for (auto it=bullets.begin();it!=bullets.end();it++){
-            if (*it==bullet){
-                delete bullet;
-                bullets.erase(it);
-                break;
-            }
-        }
+//    void removeBullet(Bullet* bullet){      //wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+//        for (auto it=bullets.begin();it!=bullets.end();it++){
+//            if (*it==bullet){
+//                delete bullet;
+//                bullets.erase(it);
+//                break;
+//            }
+//        }
 
-    }
+//    }
     int bulletCount(){return bullets.size();}   //ez
     void update(sf::Time& time){            //ok
-        for (auto& x:bullets){
-            x->update(time);
-            if(x->overdue) {removeBullet(x);}
+//        for (auto& x:bullets){
+//            x->update(time);
+//            if(x->overdue) {removeBullet(x);}
+//        }
+        for(auto it=bullets.begin(); it<bullets.end();){
+            (*it)->update(time);
+            if ((*it)->overdue){
+                bullets.erase(it);
+            }else it++;
         }
     }
 };
@@ -311,26 +317,34 @@ public:
         temp->setPosition(destination+sf::Vector2f(cosf(toRad(angle+180))*distance,-sinf(toRad(angle+180))*distance));
         obstacles.emplace_back(temp);
     }
-    void removeObstacle(Obstacle* obstacle){
-        for (auto it=obstacles.begin();it!=obstacles.end();it++){
-            if (*it==obstacle){
-                delete obstacle;
-                obstacles.erase(it);
-                break;
-            }
-        }
-    }
+//    void removeObstacle(Obstacle* obstacle){    //wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+//        for (auto it=obstacles.begin();it!=obstacles.end();it++){
+//            if (*it==obstacle){
+//                delete obstacle;
+//                obstacles.erase(it);
+//                std::cout<<"wywalone"<<std::endl;
+//                break;
+//            }
+//        }
+//    }
     int obstacleCount(){return obstacles.size();}
     void update(sf::Time& time){            //ok
-        for (auto& x:obstacles){
-            x->update(time);
-            if(x->overdue_) {removeObstacle(x);}
+//        for (auto& x:obstacles){
+//            x->update(time);
+//            if(x->overdue_) {removeObstacle(x);}
+//        }
+        for(auto it=obstacles.begin(); it<obstacles.end();){
+            (*it)->update(time);
+            if ((*it)->overdue_){
+                obstacles.erase(it);
+            }else it++;
         }
     }
 };
 
 struct SessionData{
     sf::Color default_color={180,90,30};
+    sf::Color secondary_color={140,50,10};
     using BulletIndexType=std::vector<BulletList*>;
     using ObstacleIndexType=std::vector<ObstacleList*>;
     static ShipMovementMode movemode;
@@ -342,7 +356,9 @@ struct SessionData{
     static BulletIndexType* current_bullet_index;
     static ObstacleIndexType* current_obstacle_index;
     static sf::Clock generation_timer_;
+    static sf::Clock timer;
     static bool game_is_on_;
+    static bool pause_is_on_;
     static float obstacle_time_;
     static float obstacle_frequency_;
     static float generation_modifier_;
@@ -371,13 +387,26 @@ struct SessionData{
         }
         return 0;
     }
-    static bool gameStart(){
+    static bool gameStartTrigger(){
         if(gamestate==GameState::Gameplay&&!game_is_on_){
             game_is_on_=true;
             generation_timer_.restart();
+            pause_time_=0;
             return 1;
         }
         return 0;
+    }
+    static void pauseOnTrigger(){
+        if(gamestate==GameState::Pause&&!pause_is_on_){
+            pause_start_=generation_timer_.getElapsedTime().asSeconds();
+            pause_is_on_=true;
+        }
+    }
+    static void endOfPause(bool forced=false){
+        if(forced||(pause_is_on_&&gamestate!=GameState::Pause)){
+            pause_time_+=generation_timer_.getElapsedTime().asSeconds()-pause_start_;
+        }
+
     }
     static void setMovementMode(ShipMovementMode mode){movemode=mode;}
     static void setGamestate(GameState state){gamestate=state;}
@@ -388,20 +417,23 @@ struct SessionData{
             BulletList* bullets=(*current_bullet_index)[i];
             ObstacleList* obstacles=(*current_obstacle_index)[i];
             for (auto &b: bullets->bullets){
-                bool collision=0;
-                for (auto &o:obstacles->obstacles){
-                    collision=checkForCollision(b,o);
-                    if (collision){
-                        o->hit(b->power());
-                        b->terminate();
-                    }
-                    int temp=o->terminate();
-                    if (temp!=0){
-                        generation_modifier_+=10*(o->given_bonus_==1);
-                        score+=100+300*(o->given_bonus_==1);
-                        target_health_+=o->given_bonus_==1;
-//                        std::cout<<"shot "<<temp<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<std::endl;
-                    break;
+                if(!b->overdue){
+                    bool collision=0;
+                    for (auto &o:obstacles->obstacles){
+                        collision=checkForCollision(b,o);
+                        if (collision){
+                            o->hit(b->power());
+                            b->terminate();
+                        }
+                        if(o->overdue_) continue;
+                        int temp=o->terminate();
+                        if (temp!=0){
+                            generation_modifier_+=7*(o->given_bonus_==1);
+                            score+=100+300*(o->given_bonus_==1);
+                            target_health_+=o->given_bonus_==1;
+                            std::cout<<"shot "<<temp<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<std::endl;
+                        break;
+                        }
                     }
                 }
             }
@@ -413,8 +445,8 @@ struct SessionData{
                 float y=target_position_.y-o->getPosition().y;
                 if(dist>=x*x+y*y){
                     o->terminate(1);
-                    generation_modifier_-=10*(o->given_bonus_==-1);
-//                    std::cout<<"natural "<<code<<"  "<<o->given_bonus_<<"  "<<generation_modifier_<<"  "<<target_health_<<"  "<<obstacle_frequency_<<std::endl;
+                    generation_modifier_-=5*(o->given_bonus_==-1);
+                    std::cout<<"natural   "<<o->given_bonus_<<"  "<<generation_modifier_<<"  "<<target_health_<<"  "<<obstacle_frequency_<<std::endl;
                     target_health_-=(o->given_bonus_==0);
                 }
             }
@@ -433,12 +465,16 @@ struct SessionData{
     }
     static void updateSession(sf::Time& elapsed){
         float temp=generation_timer_.getElapsedTime().asSeconds();
-        obstacle_frequency_=expf(fmaxf(temp-generation_modifier_,0)/69)+start_difficulty_modifier_;
-//        std::cout<<temp<<"  "<<generation_modifier_<<"  "<<obstacle_frequency_<<std::endl;
-        updateCollisions(elapsed);
-        generateObstacles(elapsed);
+        if(gamestate!=GameState::Pause){
+            obstacle_frequency_=expf(fmaxf(temp-generation_modifier_-pause_time_,0)/69)+start_difficulty_modifier_;
+//            std::cout<<"czas zegara: "<<temp<<" | modifier: "<<generation_modifier_<<" | frequency: "<<obstacle_frequency_<<" | czas gry: "<<temp-pause_time_<<" | score: "<<score<<std::endl;
+            updateCollisions(elapsed);
+            generateObstacles(elapsed);
+        }
     }
 private:
+    static float pause_start_;
+    static float pause_time_;
     static bool checkForCollision(const Bullet* bullet, const Obstacle* obstacle){
         auto temp = bullet->getPosition()-obstacle->getPosition();
         float bruh = temp.x*temp.x+temp.y*temp.y;           //x^2+y^2=dist^2 (...??)
@@ -451,7 +487,7 @@ private:
 struct CustomNeatText: public sf::Text{
     CustomNeatText(std::string text, sf::Font& font, int size=30):sf::Text(text,font,size){
         setFillColor(session_flags.default_color);
-        setOutlineColor(sf::Color{140,50,10});
+        setOutlineColor(session_flags.secondary_color);
         setOutlineThickness(2);
     }
 };

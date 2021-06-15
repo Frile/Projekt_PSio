@@ -8,11 +8,15 @@
 #include <vector>
 #endif
 
-
-/* Jakie kategorie?
- * -głowne menu z ustawieniami na boku
- * -win/lose, można w sumie na jednej karcie dać
- *
+/* Wersja 1.0!! Co my tu mamy za dobra:
+ * -karta tytułowa, esc wyłącza, inne klawisze przechodzą do -
+ * -menu! tutaj można uruchomić grę lub wrócić do karty, z menu nie wychodzi się przez esc
+ * -gameplay!! noo śmiga elegancko, są przeszkody które trzeba zestrzelić przed ich dotarciem do niebieskiego kółka
+ * -rodzaje przeszkód:
+ * --niebieskie - normalne, 1hp, jak dolecą to zabierają ci 1hp
+ * --fioletowe - nie zadają obrażeń, 2hp, po zestrzeleniu zmniejszają tempo nowych pocisków i regenerują ci 1hp
+ * --czerwone - bydlaki 3hp, nie zadają obrażeń ale jak dolecą to znacząco przyspieszają tempo
+ * -pauza podczas gry po wciśnięciu esc, P wraca do gry, I kończy grę natychmiast
  */
 
 
@@ -50,10 +54,14 @@ float SessionData::obstacle_time_=0;
 float SessionData::generation_modifier_=0;
 sf::Vector2f SessionData::target_position_=window_center;
 float SessionData::target_radius_=orbit_radius+20;
-int SessionData::target_health_=1;
+int SessionData::target_health_=10;
 bool SessionData::game_is_on_=false;
 float SessionData::start_difficulty_modifier_=0;
 sf::Vector2f SessionData::window_center_=window_center;
+float SessionData::pause_time_=0;
+bool SessionData::pause_is_on_=false;
+float SessionData::pause_start_=0;
+sf::Clock SessionData::timer=sf::Clock();
 
 
 
@@ -87,6 +95,8 @@ int main() {
     CustomNeatText health_points(std::to_string(session_flags.target_health_),font);
     CustomNeatText score_text("Score: ",font);
     CustomNeatText health_text("Lives: ",font);
+    CustomNeatText pause_text("Pauza || [P]",font);
+    pause_text.setPosition(360,40);
 
 
     BulletList bullet_area1(r1);
@@ -138,20 +148,19 @@ int main() {
     linijka.setFillColor(sf::Color{200,90,200});
 
 
-    sf::Clock timer;
     SessionData::generation_timer_.restart();
+    session_flags.timer.restart();
 
 //    main loop
     while (window.isOpen()) {
-    //    startowe rzeczy
-        sf::Time elapsed=timer.restart();
+        //startowe rzeczy
+        sf::Time elapsed=session_flags.timer.restart();
         sf::Event event;
-
-        if(sf::Mouse::isButtonPressed(sf::Mouse::Right)){}//       wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
 
          //czyścimy okno
         if(session_flags.gamestate!=GameState::Pause)window.clear(sf::Color{11,15,23});
 
+        //sprawdzamy stany gry
         if(session_flags.gamestate==GameState::Titlecard){
             while (window.pollEvent(event)) {
                 if (event.type == sf::Event::Closed||(event.type==sf::Event::KeyPressed&&event.key.code==sf::Keyboard::Escape))
@@ -179,9 +188,9 @@ int main() {
             start_button.draw(window);
             title_button.execute(window);
             start_button.execute(window);
-            if(session_flags.gameStart()){
+            if(session_flags.gameStartTrigger()){
                 score_text.setPosition(10,0);
-                score_count.setPosition(110,0);
+//                score_count.setPosition(110,0);
                 health_points.setPosition(110,45);
                 health_text.setPosition(10,45);
             }
@@ -207,6 +216,10 @@ int main() {
                 }
             }
             if(sf::Keyboard::isKeyPressed(sf::Keyboard::P)){session_flags.gamestate=GameState::Gameplay;}
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::I)){
+                session_flags.game_is_on_=!session_flags.endOfGameCheck(true);
+            }
+            session_flags.endOfPause();
         }
         else if(session_flags.gamestate==GameState::Gameplay){
         //    sprawdzamy eventy
@@ -222,12 +235,17 @@ int main() {
 //                    ObstacleListIndex_Orbit[part]->randomObstacle_Destination(part,session_flags.window_center_,20,520,1);
 //                }
             }
+
+
         //    obslugujemy eventy
             statek.update(elapsed,1);
             session_flags.updateSession(elapsed);
             score_count.setString(std::to_string(session_flags.score));
+            score_count.setPosition(110,0);
             health_points.setString(std::to_string(session_flags.target_health_));
+
             session_flags.game_is_on_=!session_flags.endOfGameCheck();
+            session_flags.pauseOnTrigger();
 
         //    czyscimy i rysujemy obiekty
             window.draw(orbitLine);
