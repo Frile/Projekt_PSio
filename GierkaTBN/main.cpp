@@ -17,6 +17,13 @@
  * --fioletowe - nie zadają obrażeń, 2hp, po zestrzeleniu zmniejszają tempo nowych pocisków i regenerują ci 1hp
  * --czerwone - bydlaki 3hp, nie zadają obrażeń ale jak dolecą to znacząco przyspieszają tempo
  * -pauza podczas gry po wciśnięciu esc, P wraca do gry, I kończy grę natychmiast
+ * 11100 wynik miałem, może to być jakiś próg do testowania się
+ */
+
+
+/*
+ * tak wgl to mogłem list użyć zamiast vector xD jako że dużo usuwam i dodaję ze środka
+ * ahh buul
  */
 
 
@@ -62,6 +69,9 @@ float SessionData::pause_time_=0;
 bool SessionData::pause_is_on_=false;
 float SessionData::pause_start_=0;
 sf::Clock SessionData::timer=sf::Clock();
+const sf::Color SessionData::main_color={180,90,30};
+const sf::Color SessionData::secondary_color={140,50,10};
+sf::Font SessionData::font=sf::Font();
 
 
 
@@ -78,25 +88,29 @@ int main() {
     std::vector<BulletList*> BulletList_Free(0);
     std::vector<ObstacleList*> ObstacleList_Free(0); //caly ekran to 1 obszar
 
-    sf::Font font;
-    if(!font.loadFromFile("Inconsolata-Medium.ttf")){
+
+    session_flags.font.loadFromFile("Inconsolata-Medium.ttf");
+    if(!session_flags.font.loadFromFile("Inconsolata-Medium.ttf")){
         std::cout<<"Nie udalo sie zaladowac tekstur, uruchom ponownie <3"<<std::endl;
         window.close();
     }
 
-    Button_Gamestate start_button("Start",&font,GameState::Gameplay);
+    Button_Gamestate start_button("Start",&session_flags.font,GameState::Gameplay);
     start_button.setButtonPosition(sf::Vector2f{70,200});
-    Button_Gamestate title_button("To Title",&font,GameState::Titlecard);
+    Button_Gamestate title_button("To Title",&session_flags.font,GameState::Titlecard);
     title_button.setButtonPosition(sf::Vector2f{70, 300});
-    Button_Gamestate menu_button("To Menu",&font, GameState::SettingsMenu);
+    Button_Gamestate menu_button("To Menu",&session_flags.font, GameState::SettingsMenu);
     menu_button.setButtonPosition(10,10);
 
-    CustomNeatText score_count(std::to_string(session_flags.score),font);
-    CustomNeatText health_points(std::to_string(session_flags.target_health_),font);
-    CustomNeatText score_text("Score: ",font);
-    CustomNeatText health_text("Lives: ",font);
-    CustomNeatText pause_text("Pauza || [P]",font);
+    CustomNeatText score_count(std::to_string(session_flags.score),session_flags.font);
+    CustomNeatText health_points(std::to_string(session_flags.target_health_),session_flags.font);
+    CustomNeatText score_text("Score: ",session_flags.font);
+    CustomNeatText health_text("Lives: ",session_flags.font);
+    CustomNeatText pause_text("Pauza || [P]",session_flags.font);
     pause_text.setPosition(360,40);
+
+    PauseSymbol pause_symbol(760,30,session_flags.font);
+    X_Symbol x_symbol(760,70,session_flags.font);
 
 
     BulletList bullet_area1(r1);
@@ -156,9 +170,9 @@ int main() {
         //startowe rzeczy
         sf::Time elapsed=session_flags.timer.restart();
         sf::Event event;
-
          //czyścimy okno
         if(session_flags.gamestate!=GameState::Pause)window.clear(sf::Color{11,15,23});
+
 
         //sprawdzamy stany gry
         if(session_flags.gamestate==GameState::Titlecard){
@@ -169,8 +183,8 @@ int main() {
                     session_flags.setGamestate(GameState::SettingsMenu);
                 }
             }
-            CustomNeatText splash("=press any key=",font);
-            CustomNeatText namecard("TBN Shooter Game", font, 80);
+            CustomNeatText splash("=press any key=",session_flags.font);
+            CustomNeatText namecard("TBN Shooter Game", session_flags.font, 80);
             namecard.setPosition(80,60);
             splash.setPosition(280,400);
             namecard.setScale(1,2);
@@ -200,7 +214,7 @@ int main() {
                 if (event.type == sf::Event::Closed)
                     window.close();
              }
-            CustomNeatText namecard("Final score:",font);
+            CustomNeatText namecard("Final score:",session_flags.font);
             namecard.setPosition(310,260);
             score_count.setPosition(370,300);
             window.draw(namecard);
@@ -220,6 +234,8 @@ int main() {
                 session_flags.game_is_on_=!session_flags.endOfGameCheck(true);
             }
             session_flags.endOfPause();
+            pause_symbol.draw(window);
+            x_symbol.draw(window);
         }
         else if(session_flags.gamestate==GameState::Gameplay){
         //    sprawdzamy eventy
@@ -235,7 +251,7 @@ int main() {
 //                    ObstacleListIndex_Orbit[part]->randomObstacle_Destination(part,session_flags.window_center_,20,520,1);
 //                }
             }
-
+            if(!window.hasFocus())session_flags.gamestate=GameState::Pause;
 
         //    obslugujemy eventy
             statek.update(elapsed,1);

@@ -343,8 +343,9 @@ public:
 };
 
 struct SessionData{
-    sf::Color default_color={180,90,30};
-    sf::Color secondary_color={140,50,10};
+    static sf::Font font;
+    const static sf::Color main_color;
+    const static sf::Color secondary_color;
     using BulletIndexType=std::vector<BulletList*>;
     using ObstacleIndexType=std::vector<ObstacleList*>;
     static ShipMovementMode movemode;
@@ -486,7 +487,7 @@ private:
 
 struct CustomNeatText: public sf::Text{
     CustomNeatText(std::string text, sf::Font& font, int size=30):sf::Text(text,font,size){
-        setFillColor(session_flags.default_color);
+        setFillColor(session_flags.main_color);
         setOutlineColor(session_flags.secondary_color);
         setOutlineThickness(2);
     }
@@ -553,7 +554,106 @@ public:
     }
 };
 
+class PauseSymbol{
+    sf::RectangleShape pt1;
+    sf::RectangleShape pt1_2;
+    sf::RectangleShape pt2;
+    sf::RectangleShape pt2_2;
+    sf::RectangleShape cross;
+//    sf::RectangleShape base;
+    CustomNeatText label;
+public:
+    PauseSymbol(float x, float y, sf::Font &font):label("P",font){
+        pt1.setSize(sf::Vector2f{6,24});
+        pt1.setPosition(x,y);
+        pt1.setOrigin(8,12);
+        pt1.setFillColor(session_flags.main_color);
+        pt1.setOutlineColor(session_flags.secondary_color);
+        pt1.setOutlineThickness(2);
+        pt1_2.setSize(sf::Vector2f{6,24});
+        pt1_2.setPosition(x,y);
+        pt1_2.setOrigin(8,12);
+        pt1_2.setFillColor(session_flags.main_color);
 
+
+        pt2.setSize(sf::Vector2f{6,24});
+        pt2.setPosition(x,y);
+        pt2.setOrigin(-4,12);
+        pt2.setFillColor(session_flags.main_color);
+        pt2.setOutlineColor(session_flags.secondary_color);
+        pt2.setOutlineThickness(2);
+        pt2_2.setSize(sf::Vector2f{6,24});
+        pt2_2.setPosition(x,y);
+        pt2_2.setOrigin(-4,12);
+        pt2_2.setFillColor(session_flags.main_color);
+
+//        base.setSize({24,24});
+//        base.setPosition(x,y);
+//        base.setOrigin(12,12);
+
+        label.setPosition(x,y);
+        label.setOrigin(40,20);
+
+        cross.setSize(sf::Vector2f{4,32});
+        cross.setPosition(x,y);
+        cross.setOrigin(2,17);
+        cross.setRotation(80);
+        cross.setFillColor(session_flags.main_color);
+        cross.setOutlineColor(session_flags.secondary_color);
+        cross.setOutlineThickness(2);
+    }
+    void draw(sf::RenderTarget& target, bool crossed_=true, bool key_=true){
+        target.draw(pt1);
+        target.draw(pt2);
+        if(crossed_){
+            target.draw(cross);
+            target.draw(pt1_2);
+            target.draw(pt2_2);
+        }
+        if(key_)target.draw(label);
+    }
+
+};
+
+struct X_Symbol{
+    X_Symbol(float x, float y, sf::Font &font):label("I",font){
+        pt1.setSize(sf::Vector2f{6,30});
+        pt1.setPosition(x,y);
+        pt1.setOrigin(4,15);
+        pt1.setFillColor(session_flags.main_color);
+        pt1.setOutlineColor(session_flags.secondary_color);
+        pt1.setOutlineThickness(2);
+        pt1.setRotation(45);
+        pt1_2.setSize(sf::Vector2f{6,30});
+        pt1_2.setPosition(x,y);
+        pt1_2.setOrigin(4,15);
+        pt1_2.setFillColor(session_flags.main_color);
+        pt1_2.setRotation(45);
+
+        pt2.setSize(sf::Vector2f{6,30});
+        pt2.setPosition(x,y);
+        pt2.setOrigin(4,15);
+        pt2.setFillColor(session_flags.main_color);
+        pt2.setOutlineColor(session_flags.secondary_color);
+        pt2.setOutlineThickness(2);
+        pt2.setRotation(-45);
+
+        label.setOrigin(40,20);
+        label.setPosition(x,y);
+    }
+    void draw(sf::RenderTarget& window){
+        window.draw(pt1);
+        window.draw(pt2);
+        window.draw(pt1_2);
+        window.draw(label);
+    }
+private:
+    CustomNeatText label;
+    sf::RectangleShape pt1;
+    sf::RectangleShape pt1_2;
+    sf::RectangleShape pt2;
+
+};
 
 
 
