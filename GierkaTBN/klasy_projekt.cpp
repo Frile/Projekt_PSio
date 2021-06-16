@@ -53,10 +53,8 @@ public:
         max_distance_=max_distance;
     }
     bool overdue=false;                             //ez
-    void setSpeed(int speed){speed_=speed;}         //ez
     void update(sf::Time& time){                    //ez
         float temp=speed_*time.asSeconds();
-        //std::cout<<direction_<<"sranie"<<std::endl;
         move(cosf(toRad(direction_))*temp,-sinf(toRad(direction_))*temp);  //ez
         current_distance_+=temp;
         if (current_distance_>=max_distance_){
@@ -73,25 +71,7 @@ public:
     BulletList(sf::FloatRect &obszar):region(obszar){};
     std::vector<Bullet*> bullets;
     sf::FloatRect region;
-    void addBullet(Bullet* new_bullet){     //ok
-        bullets.emplace_back(new_bullet);
-    }
-//    void removeBullet(Bullet* bullet){      //wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
-//        for (auto it=bullets.begin();it!=bullets.end();it++){
-//            if (*it==bullet){
-//                delete bullet;
-//                bullets.erase(it);
-//                break;
-//            }
-//        }
-
-//    }
-    int bulletCount(){return bullets.size();}   //ez
     void update(sf::Time& time){            //ok
-//        for (auto& x:bullets){
-//            x->update(time);
-//            if(x->overdue) {removeBullet(x);}
-//        }
         for(auto it=bullets.begin(); it<bullets.end();){
             (*it)->update(time);
             if ((*it)->overdue){
@@ -112,7 +92,6 @@ class Ship: public sf::CircleShape{
     float orbiting_radius_=200;
     bool auto_shooting=false;
     float bullet_velocity_=100;
-    float count=0;
     std::vector<BulletList*>* bullet_storage_;
     sf::Vector2f orbiting_point_;
     Dot indicator_;
@@ -182,7 +161,7 @@ public:
         if(cooldown_>min_cooldown_){
             auto dest=bulletlistChoose(bullet_storage_);
             if(dest!=nullptr){
-                        std::cout<<count++<<"pew pew"<<std::endl;
+//                std::cout<<count++<<"pew pew"<<std::endl;
                 cooldown_=0;
                 Bullet* temp=new Bullet(getRotation()*(1-2*(mode_==ShipMovementMode::Orbit))+180*(!shootsOutsideOrbit)*(mode_==ShipMovementMode::Orbit),indicator_.getPosition(),speed,power_);
                 dest->bullets.emplace_back(temp);
@@ -203,10 +182,7 @@ public:
         speed_aux_=aux;
         speed_angular_=angular;
     }
-    void setPower(int new_power){power_=new_power;}     //ez
-    void setHitbox(int radius){setRadius(radius);}      //ez
     void setControlMode(ShipMovementMode mode){mode_=mode;}     //ez
-    void setBulletSpeed(float newspeed){bullet_velocity_=newspeed;}
     void drawShip(sf::RenderWindow& window){
         window.draw(*this);
         window.draw(indicator_);
@@ -222,7 +198,6 @@ public:
         indicator_.setPosition(getPosition()+sf::Vector2f{indicator_distance_*cosf(toRad(-angle)),indicator_distance_*sinf(toRad(-angle))});
 
     }
-    void setBulletStorage(std::vector<BulletList*>* storage){bullet_storage_=storage;}
     void setShootingMode(bool is_auto){auto_shooting=is_auto;}
 };
 
@@ -234,6 +209,7 @@ class Obstacle: public sf::CircleShape{
     int health_=1;
 public:
     int given_bonus_;
+    bool overdue_=false;
     Obstacle(float direction, float radius, int health=1, float speed=0,float max_distance=400, int bonus=0):sf::CircleShape(radius){
         speed_=speed;
         max_distance_=max_distance;
@@ -245,7 +221,7 @@ public:
         }else if (bonus==1){
             setFillColor(sf::Color::Magenta);
         }else if (bonus==-1){
-            setFillColor(sf::Color{200,60,20});
+            setFillColor(sf::Color{180,60,20});
         }
         given_bonus_=bonus;
     };
@@ -260,7 +236,6 @@ public:
         }
         return terminate();
     }
-    bool overdue_=false;
     int terminate(bool forced=false){
         if(health_<1){
             overdue_=true;
@@ -276,7 +251,6 @@ public:
 };
 
 class ObstacleList{
-    int max_size=40;
 public:
     sf::Vector2f position_;
     float direction_;
@@ -284,9 +258,6 @@ public:
     std::vector<Obstacle*> obstacles;
     ObstacleList(sf::FloatRect& obszar){
         region=obszar;
-    }
-    void addObstacle(Obstacle* new_obstacle){
-        if(obstacleCount()<max_size)obstacles.emplace_back(new_obstacle);
     }
     void randomObstacles(int n=1, float speed=0, bool isSpeedRandom=0, float angle=0, bool isAngleRandom=0, sf::Vector2f pos={0,0}, bool isPositionRandom=1, int health=1, float radius=25){
         for(int i=0;i<n;i++){
@@ -319,22 +290,8 @@ public:
         temp->setPosition(destination+sf::Vector2f(cosf(toRad(angle+180))*distance,-sinf(toRad(angle+180))*distance));
         obstacles.emplace_back(temp);
     }
-//    void removeObstacle(Obstacle* obstacle){    //wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
-//        for (auto it=obstacles.begin();it!=obstacles.end();it++){
-//            if (*it==obstacle){
-//                delete obstacle;
-//                obstacles.erase(it);
-//                std::cout<<"wywalone"<<std::endl;
-//                break;
-//            }
-//        }
-//    }
     int obstacleCount(){return obstacles.size();}
     void update(sf::Time& time){            //ok
-//        for (auto& x:obstacles){
-//            x->update(time);
-//            if(x->overdue_) {removeObstacle(x);}
-//        }
         for(auto it=obstacles.begin(); it<obstacles.end();){
             (*it)->update(time);
             if ((*it)->overdue_){
@@ -525,10 +482,9 @@ public:
         text_params_.setPosition(pos+sf::Vector2f{10,0});
     }
     void setPositionButton(float x, float y){
-        RectangleShape::setPosition(x,y);
-        text_params_.setPosition(sf::Vector2f{x,y}+sf::Vector2f{10,0});
+        setPositionButton(sf::Vector2f{x,y});
     }
-    virtual void update_state(sf::RenderWindow& target){
+    void update_state(sf::RenderWindow& target){
         state_=sf::Mouse::isButtonPressed(sf::Mouse::Left)&&getGlobalBounds().contains(target.mapPixelToCoords(sf::Mouse::getPosition(target)));
     };
 };
@@ -563,16 +519,12 @@ class Button_Autoshoot:public Button{   //moglem osobny class do button_latch zr
     std::string yee="yes";
     std::string nah="noo";
     Ship* stateczek;
-//    int count=0;
 public:
     Button_Autoshoot(Ship* ship, sf::Font* font, int fontsize=30,sf::Vector2f position={0,0} ):Button("AutoShoot: noo",font,fontsize,position){stateczek=ship;}
     void execute(sf::RenderWindow& target){
         update_state(target);
         if(state_&&!latch){
-//            std::cout<<count++<<" "<<state_;
             latch=true;
-//            std::cout<<" lmao";
-//            std::cout<<stateczek->shootingMode();
             if(stateczek->shootingMode()){
                 text_params_.setString(base+nah);
                 stateczek->setShootingMode(0);
@@ -584,9 +536,7 @@ public:
         }
         if(latch&&!state_){
             latch=false;
-//            std::cout<<"oof";
         }
-//        std::cout<<std::endl;
     }
 };
 
@@ -621,7 +571,6 @@ class PauseSymbol{
     sf::RectangleShape pt2;
     sf::RectangleShape pt2_2;
     sf::RectangleShape cross;
-//    sf::RectangleShape base;
     CustomNeatText label;
 public:
     PauseSymbol(float x, float y, sf::Font &font):label("P",font){
@@ -647,10 +596,6 @@ public:
         pt2_2.setPosition(x,y);
         pt2_2.setOrigin(-4,12);
         pt2_2.setFillColor(session_flags.main_color);
-
-//        base.setSize({24,24});
-//        base.setPosition(x,y);
-//        base.setOrigin(12,12);
 
         label.setPosition(x,y);
         label.setOrigin(40,20);

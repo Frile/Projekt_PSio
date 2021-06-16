@@ -131,7 +131,7 @@ the target (you don't want that either)\
     CustomNeatText tutorial_splash(tutorial_text,session_flags.font,20);
     tutorial_splash.setPosition(320,50);
 
-    //customowe 'znaczki'+tekst
+    //customowe 'znaczki' +tekst
     PauseSymbol pause_symbol(760,30,session_flags.font);
     X_Symbol x_symbol(760,70,session_flags.font);
 
