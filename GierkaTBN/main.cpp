@@ -17,7 +17,7 @@
  * --fioletowe - nie zadają obrażeń, 2hp, po zestrzeleniu zmniejszają tempo nowych pocisków i regenerują ci 1hp
  * --czerwone - bydlaki 3hp, nie zadają obrażeń ale jak dolecą to znacząco przyspieszają tempo
  * -pauza podczas gry po wciśnięciu esc, P wraca do gry, I kończy grę natychmiast
- * 24100 wynik miałem, może to być jakiś próg do testowania się
+ * 53000 wynik miałem (serio chcialo mi sie), może to być jakiś próg do testowania się...?
  */
 
 
@@ -50,28 +50,29 @@ float toDeg(float radians){
     return radians/pi*180;
 }
 
-//inicjalizacja static members, no sporo wiem :P
+//inicjalizacja static members, no sporo wiem, bywa :P
 ShipMovementMode SessionData::movemode=ShipMovementMode::Orbit;
 GameState SessionData::gamestate=GameState::Titlecard;
-int SessionData::score=0;
+bool SessionData::game_is_on_=false;
+bool SessionData::exponential=true;
+bool SessionData::pause_is_on_=false;
 SessionData::BulletIndexType* SessionData::current_bullet_index=nullptr;
 SessionData::ObstacleIndexType* SessionData::current_obstacle_index=nullptr;
+const sf::Color SessionData::main_color={180,90,30};
+const sf::Color SessionData::secondary_color={140,50,10};
 sf::Clock SessionData::generation_timer_=sf::Clock();
+sf::Clock SessionData::timer=sf::Clock();
+int SessionData::score=0;
 float SessionData::obstacle_frequency_=1;
 float SessionData::obstacle_time_=0;
 float SessionData::generation_modifier_=0;
-sf::Vector2f SessionData::target_position_=window_center;
-float SessionData::target_radius_=orbit_radius+20;
-int SessionData::target_health_=10;
-bool SessionData::game_is_on_=false;
-float SessionData::start_difficulty_modifier_=0;
-sf::Vector2f SessionData::window_center_=window_center;
-float SessionData::pause_time_=0;
-bool SessionData::pause_is_on_=false;
 float SessionData::pause_start_=0;
-sf::Clock SessionData::timer=sf::Clock();
-const sf::Color SessionData::main_color={180,90,30};
-const sf::Color SessionData::secondary_color={140,50,10};
+float SessionData::start_difficulty_modifier_=0;
+float SessionData::target_radius_=orbit_radius+20;
+float SessionData::pause_time_=0;
+sf::Vector2f SessionData::target_position_=window_center;
+sf::Vector2f SessionData::window_center_=window_center;
+int SessionData::target_health_=3;
 sf::Font SessionData::font=sf::Font();
 
 
@@ -81,7 +82,7 @@ int main() {
     sf::RenderWindow window(sf::VideoMode(session_flags.window_center_.x*2,window_height), "PSiO Gierka TBN",sf::Style::Close);
     window.setFramerateLimit(100);
 
-    //font initialization
+    //font initialization, nic nie poradze jak sie czcionka nie zaladuje, niestety
     session_flags.font.loadFromFile("Inconsolata-Medium.ttf");
     if(!session_flags.font.loadFromFile("Inconsolata-Medium.ttf")){
         std::cout<<"Nie udalo sie zaladowac tekstur, uruchom ponownie <3"<<std::endl;
@@ -99,9 +100,9 @@ int main() {
 
     //guziczki generujemy
     Button_Gamestate start_button("Start",&session_flags.font,GameState::Gameplay);
-    start_button.setButtonPosition(sf::Vector2f{70,200});
+    start_button.setPositionButton(sf::Vector2f{70,200});
     Button_Gamestate title_button("To Title",&session_flags.font,GameState::Titlecard);
-    title_button.setButtonPosition(sf::Vector2f{70, 300});
+    title_button.setPositionButton(sf::Vector2f{70, 300});
     Button_Gamestate menu_button("To Menu",&session_flags.font, GameState::SettingsMenu);
     Button_Gamestate quit_button("Quit",&session_flags.font,GameState::Close);
 
@@ -110,6 +111,25 @@ int main() {
     CustomNeatText health_points(std::to_string(session_flags.target_health_),session_flags.font);
     CustomNeatText score_text("Score: ",session_flags.font);
     CustomNeatText health_text("Lives: ",session_flags.font);
+    std::string tutorial_text("\
+A,D - movement on orbit <-0->\n\
+Shift - makes you move faster\n\
+Space - shoot bullets, pew pew\n\
+Esc(or changing the focus) - pause\n\n\
+Your goal is to shoot as much\n\
+as you can :) Shoot the obstacles before\n\
+they reach the dark blue circle.\n\
+The obstacles come in 3 colors:\n\
+* Purple - 2HP, decrease generation rate and\n\
+give the target +1HP (very good indeed), they\n\
+give more points too ^_^\n\
+* Red - 3HP, increases obstacle rate\n\
+if not shot down (not good)\n\
+* Blue - 1HP, only these deal damage to\n\
+the target (you don't want that either)\
+");
+    CustomNeatText tutorial_splash(tutorial_text,session_flags.font,20);
+    tutorial_splash.setPosition(320,50);
 
     //customowe 'znaczki'+tekst
     PauseSymbol pause_symbol(760,30,session_flags.font);
@@ -161,6 +181,9 @@ int main() {
     sf::RectangleShape linijka(sf::Vector2f(10,10));
     linijka.setFillColor(sf::Color{200,90,200});
 
+    Button_Autoshoot autoshoot_button(&statek,&session_flags.font,30,{330,440});
+    Button_Generation generation_button(&session_flags,&session_flags.font,30,{330,500});
+
     //setup zegarów żeby nie koślawiły mi numerków
     SessionData::generation_timer_.restart();
     session_flags.timer.restart();
@@ -171,7 +194,7 @@ int main() {
         sf::Time elapsed=session_flags.timer.restart();
         sf::Event event;
          //czyścimy okno
-        if(session_flags.gamestate!=GameState::Pause)window.clear(sf::Color{11,15,23});
+        if(session_flags.gamestate!=GameState::Pause)window.clear(sf::Color{21,25,33});
 
 
         //sprawdzamy stany gry
@@ -202,9 +225,14 @@ int main() {
             start_button.draw(window);
             title_button.execute(window);
             start_button.execute(window);
-            quit_button.setButtonPosition(70,400);
+            quit_button.setPositionButton(70,400);
             quit_button.draw(window);
             quit_button.execute(window);
+            window.draw(tutorial_splash);
+            autoshoot_button.execute(window);
+            autoshoot_button.draw(window);
+            generation_button.execute(window);
+            generation_button.draw(window);
             if(session_flags.gameStartTrigger()){
                 score_text.setPosition(10,0);
                 health_points.setPosition(110,45);
@@ -221,10 +249,10 @@ int main() {
             score_count.setPosition(370,300);
             window.draw(namecard);
             window.draw(score_count);
-            menu_button.setButtonPosition(session_flags.window_center_.x-menu_button.getSize().x/2,350);
+            menu_button.setPositionButton(session_flags.window_center_.x-menu_button.getSize().x/2,350);
             menu_button.execute(window);
             menu_button.draw(window);
-            quit_button.setButtonPosition(session_flags.window_center_.x-quit_button.getSize().x/2,410);
+            quit_button.setPositionButton(session_flags.window_center_.x-quit_button.getSize().x/2,410);
             quit_button.execute(window);
             quit_button.draw(window);
         }
@@ -295,9 +323,9 @@ int main() {
         }
 
     //    wyswietlamy
-        window.draw(linijka);
+//        window.draw(linijka);
         window.display();
     }
-    std::cout<<"Milego dnia zycze\\\nNara"<<std::endl;
+    std::cout<<"\nMilego dnia zycze\\\nNara"<<std::endl;
     return 0;
 }

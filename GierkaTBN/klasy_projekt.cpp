@@ -20,7 +20,7 @@ enum class ShipMovementMode{
 };
 
 enum class GameState{
-        Titlecard, SettingsMenu, Gameplay, Lose, Close, Pause // V | V | V | X | V | X
+        Titlecard, SettingsMenu, Gameplay, Lose, Close, Pause // V | V | V | V | V | V   elegancko stany wszystkie dzialaja
     };
 
 class Dot: public sf::CircleShape{
@@ -112,6 +112,7 @@ class Ship: public sf::CircleShape{
     float orbiting_radius_=200;
     bool auto_shooting=false;
     float bullet_velocity_=100;
+    float count=0;
     std::vector<BulletList*>* bullet_storage_;
     sf::Vector2f orbiting_point_;
     Dot indicator_;
@@ -178,10 +179,10 @@ public:
         bullet_velocity_=80;
     }
     void shoot(float speed, bool shootsOutsideOrbit=false){                            //ez
-        std::cout<<"pew pew"<<std::endl;
         if(cooldown_>min_cooldown_){
             auto dest=bulletlistChoose(bullet_storage_);
             if(dest!=nullptr){
+                        std::cout<<count++<<"pew pew"<<std::endl;
                 cooldown_=0;
                 Bullet* temp=new Bullet(getRotation()*(1-2*(mode_==ShipMovementMode::Orbit))+180*(!shootsOutsideOrbit)*(mode_==ShipMovementMode::Orbit),indicator_.getPosition(),speed,power_);
                 dest->bullets.emplace_back(temp);
@@ -215,6 +216,7 @@ public:
         orbiting_radius_=radius;
         orbiting_point_=center;
     }
+    bool shootingMode(){return auto_shooting;}
     void setRotation(float angle){
         sf::CircleShape::setRotation(angle);
         indicator_.setPosition(getPosition()+sf::Vector2f{indicator_distance_*cosf(toRad(-angle)),indicator_distance_*sinf(toRad(-angle))});
@@ -351,6 +353,7 @@ struct SessionData{
     static sf::Vector2f window_center_;                 //elegancko przechowane wymiary okna
     static sf::Vector2f target_position_;
     static bool game_is_on_;
+    static bool exponential;
     static bool pause_is_on_;
     static ShipMovementMode movemode;                   //jak sie statek rusza
     static GameState gamestate;                         //obecny stan gry
@@ -447,8 +450,8 @@ struct SessionData{
     static void updateSession(sf::Time& elapsed){       //update wszystikego, wszystkie listy jak i tez timer od frequency
         float temp=generation_timer_.getElapsedTime().asSeconds();
         if(gamestate!=GameState::Pause){
-            obstacle_frequency_=expf(fmaxf(temp-generation_modifier_-pause_time_,0)/69)+start_difficulty_modifier_; //exponential
-//            obstacle_frequency_=1/20*fmaxf(temp-generation_modifier_-pause_time_,0)+start_difficulty_modifier_; //linear
+            if(exponential)obstacle_frequency_=expf(fmaxf(temp-generation_modifier_-pause_time_,0)/69)+start_difficulty_modifier_; //exponential
+            if(!exponential)obstacle_frequency_=1/20*fmaxf(temp-0.8*generation_modifier_-pause_time_,0)+start_difficulty_modifier_; //linear
 //            std::cout<<"czas zegara: "<<temp<<" | modifier: "<<generation_modifier_<<" | frequency: "<<obstacle_frequency_<<" | czas gry: "<<temp-pause_time_<<" | score: "<<score<<std::endl;
             updateCollisions(elapsed);
             generateObstacles(elapsed);
@@ -499,13 +502,14 @@ protected:
     CustomNeatText text_params_;
     Dot origin_;
     bool state_;
+    bool latch=false;
     SessionData session_handle_;
 public:
     Button(std::string text, sf::Font* font, int fontsize=30,sf::Vector2f position={0,0} ):text_params_(text,*font,fontsize),origin_(position){
         text_params_.setPosition(position+sf::Vector2f{10,0});
         auto temp=text_params_.getGlobalBounds();
 //        setOrigin(sf::Vector2f{10,0});
-        setButtonPosition(position);
+        setPositionButton(position);
         setSize(sf::Vector2f(temp.width+20,temp.height+20));
         setFillColor({173, 153, 106});
         setOutlineColor({133,115,73});
@@ -514,19 +518,18 @@ public:
     void draw(sf::RenderTarget& target){
         target.draw(*this);
         target.draw(text_params_);
-        target.draw(origin_);
+//        target.draw(origin_);
     }
-    void setButtonPosition(sf::Vector2f pos){
+    void setPositionButton(sf::Vector2f pos){
         RectangleShape::setPosition(pos);
         text_params_.setPosition(pos+sf::Vector2f{10,0});
     }
-    void setButtonPosition(float x, float y){
+    void setPositionButton(float x, float y){
         RectangleShape::setPosition(x,y);
         text_params_.setPosition(sf::Vector2f{x,y}+sf::Vector2f{10,0});
     }
     virtual void update_state(sf::RenderWindow& target){
         state_=sf::Mouse::isButtonPressed(sf::Mouse::Left)&&getGlobalBounds().contains(target.mapPixelToCoords(sf::Mouse::getPosition(target)));
-//        std::cout<<state_;
     };
 };
 
@@ -551,6 +554,63 @@ public:
         update_state(target);
         if(state_){
             session_handle_.movemode=movement_it_sets_;
+        }
+    }
+};
+
+class Button_Autoshoot:public Button{   //moglem osobny class do button_latch zrobic ale nie jest potrzebny raczej, tak jak tu na 0-1 moznaby zrobic dowolna ilosc stanow, clockwork dropping gate
+    std::string base="AutoShoot: ";
+    std::string yee="yes";
+    std::string nah="noo";
+    Ship* stateczek;
+//    int count=0;
+public:
+    Button_Autoshoot(Ship* ship, sf::Font* font, int fontsize=30,sf::Vector2f position={0,0} ):Button("AutoShoot: noo",font,fontsize,position){stateczek=ship;}
+    void execute(sf::RenderWindow& target){
+        update_state(target);
+        if(state_&&!latch){
+//            std::cout<<count++<<" "<<state_;
+            latch=true;
+//            std::cout<<" lmao";
+//            std::cout<<stateczek->shootingMode();
+            if(stateczek->shootingMode()){
+                text_params_.setString(base+nah);
+                stateczek->setShootingMode(0);
+            }
+            else{
+                text_params_.setString(base+yee);
+                stateczek->setShootingMode(1);
+            }
+        }
+        if(latch&&!state_){
+            latch=false;
+//            std::cout<<"oof";
+        }
+//        std::cout<<std::endl;
+    }
+};
+
+class Button_Generation:public Button{
+    SessionData* data;
+    std::string base="Exponential: ";
+    std::string yee="yes";
+    std::string nah="noo";
+public:
+    Button_Generation(SessionData* handle, sf::Font* font, int fontsize=30,sf::Vector2f position={0,0}):Button("Exponential: yes",font,fontsize,position){data=handle;}
+    void execute(sf::RenderWindow& target){
+        update_state(target);
+        if(state_&&!latch){
+            latch=true;
+            if(data->exponential){
+                text_params_.setString(base+nah);
+            }
+            else{
+                text_params_.setString(base+yee);
+            }
+            data->exponential=!data->exponential;
+        }
+        if(latch&&!state_){
+            latch=false;
         }
     }
 };
