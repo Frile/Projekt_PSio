@@ -470,7 +470,7 @@ public:
         setSize(sf::Vector2f(temp.width+20,temp.height+20));
         setFillColor({173, 153, 106});
         setOutlineColor({133,115,73});
-        setOutlineThickness(3);
+        setOutlineThickness(8);
     }
     void draw(sf::RenderTarget& target){
         target.draw(*this);
@@ -486,6 +486,8 @@ public:
     }
     void update_state(sf::RenderWindow& target){
         state_=sf::Mouse::isButtonPressed(sf::Mouse::Left)&&getGlobalBounds().contains(target.mapPixelToCoords(sf::Mouse::getPosition(target)));
+        if(state_) setFillColor({163,133,86});
+        else setFillColor({173, 153, 106});
     };
 };
 
