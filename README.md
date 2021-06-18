@@ -1,5 +1,5 @@
 # Projekt_PSio
-zaliczenie gierka |
+zaliczenie gierka | wyszło trochę inaczej niż w kwestionariuszu
 
 
 ostatnia wersja najlepsza, 2.0.2, ale main jest z 2.0.1 najwidoczniej, musiałem nic w nim nie zmieniać i nie updateowało 'wersji'
